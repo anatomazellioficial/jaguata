@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/jaguata}
+    username: ${DB_USER:jaguata}
+    password: ${DB_PASSWORD:jaguata}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # o schema é gerenciado exclusivamente pelo Flyway
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  jwt:
+    # OBRIGATÓRIO: segredo HS256 com no mínimo 32 bytes (ex.: openssl rand -base64 48). Sem default de propósito.
+    secret: ${JWT_SECRET:}
+    ttl: ${JWT_TTL:PT1H}
+  admin:
+    # Opcional: cria o primeiro ADMIN no startup se ainda não existir.
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}

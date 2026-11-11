@@ -1,0 +1,23 @@
+# dependências e builds
+node_modules/
+target/
+.next/
+dist/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# segredos e ambiente local
+.env
+.env.*
+!.env.example
+
+# logs e sistema
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml

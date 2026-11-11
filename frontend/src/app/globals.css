@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Identidade Jaguatá */
+@theme {
+  --color-navy: #102e50;
+  --color-orange: #e78b48;
+  --color-sun: #f5c45e;
+  --color-brick: #be3d2a;
+  --color-cream: #fbf5ee;
+
+  /* nomes semânticos usados nos componentes */
+  --color-ink: #fbf5ee;     /* fundo da página */
+  --color-paper: #102e50;   /* texto principal */
+  --color-panel: #ffffff;   /* cartões */
+  --color-line: #e6dccd;    /* bordas */
+  --color-mute: #5b6b82;    /* texto secundário (contraste ~5:1 sobre creme) */
+  --color-neon: #f5c45e;    /* destaque amarelo (fundos/abas ativas) */
+  --color-danger: #be3d2a;
+
+  --font-sans: "Lexend Variable", ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+html {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--color-orange);
+  color: var(--color-navy);
+}
+
+.display {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee { animation: marquee 28s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee { animation: none; }
+  html { scroll-behavior: auto; }
+}
