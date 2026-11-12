@@ -18,8 +18,11 @@ async function parse<T>(res: Response): Promise<T> {
   if (res.status === 401 && typeof window !== "undefined" && !location.pathname.startsWith("/login")) {
     location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
   }
+  const retry = Number(res.headers.get("Retry-After"));
+  const espera = retry > 60 ? `${Math.ceil(retry / 60)} min` : retry > 0 ? `${retry} s` : "um instante";
   const msg =
     res.status === 403 ? "Você não tem permissão para esta ação."
+    : res.status === 429 ? `Muitas tentativas. Aguarde ${espera} e tente de novo.`
     : problem?.detail ?? "Algo deu errado. Tente novamente.";
   throw new ApiError(res.status, msg, problem?.campos);
 }

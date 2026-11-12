@@ -1,20 +1,26 @@
 import { NextResponse } from "next/server";
+import { forbidden, forwardClientIp, readBody, sameOrigin } from "@/lib/guard";
 import { COOKIE, decodeToken } from "@/lib/jwt";
 
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8080";
 
 export async function POST(req: Request) {
-  const body = await req.text();
-  const res = await fetch(`${BACKEND}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-    cache: "no-store",
-  });
+  if (!sameOrigin(req)) return forbidden();
+  const body = await readBody(req);
+  if (body === null) return NextResponse.json({ detail: "Corpo da requisição grande demais." }, { status: 413 });
+
+  const headers = new Headers({ "Content-Type": "application/json" });
+  forwardClientIp(req, headers); // o backend limita tentativas por IP
+
+  const res = await fetch(`${BACKEND}/api/auth/login`, { method: "POST", headers, body, cache: "no-store" });
 
   if (!res.ok) {
     const problem = await res.json().catch(() => ({ detail: "Falha ao autenticar." }));
-    return NextResponse.json(problem, { status: res.status });
+    const out = NextResponse.json(problem, { status: res.status });
+    const retry = res.headers.get("retry-after");
+    if (retry) out.headers.set("retry-after", retry);
+    out.headers.set("cache-control", "no-store");
+    return out;
   }
 
   const { accessToken, expiresInSeconds } = await res.json();
@@ -28,5 +34,6 @@ export async function POST(req: Request) {
     path: "/",
     maxAge: expiresInSeconds,
   });
+  out.headers.set("cache-control", "no-store");
   return out;
 }

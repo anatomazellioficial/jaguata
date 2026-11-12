@@ -8,7 +8,10 @@ import com.jaguata.plataforma.dto.Requests.EmpresaRequest;
 import com.jaguata.plataforma.dto.Requests.OngRequest;
 import com.jaguata.plataforma.exception.CredenciaisInvalidasException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
+import com.jaguata.plataforma.exception.TentativasExcedidasException;
 import com.jaguata.plataforma.repository.UsuarioRepository;
+import com.jaguata.plataforma.security.LoginAttemptService;
+import com.jaguata.plataforma.security.SenhaPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +28,15 @@ public class AuthService {
     private final EmpresaService empresas;
     private final OngService ongs;
     private final PasswordEncoder encoder;
+    private final LoginAttemptService tentativas;
 
     public AuthService(UsuarioRepository usuarios, EmpresaService empresas, OngService ongs,
-                       PasswordEncoder encoder) {
+                       PasswordEncoder encoder, LoginAttemptService tentativas) {
         this.usuarios = usuarios;
         this.empresas = empresas;
         this.ongs = ongs;
         this.encoder = encoder;
+        this.tentativas = tentativas;
         this.hashFalso = encoder.encode("senha-inexistente");
     }
 
@@ -65,16 +70,23 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public Usuario autenticar(String email, String senha) {
-        Usuario u = usuarios.findByEmail(normalizar(email)).orElse(null);
+        String e = normalizar(email);
+        if (tentativas.bloqueado(e)) {
+            throw new TentativasExcedidasException(tentativas.segundosRestantes());
+        }
+        Usuario u = usuarios.findByEmail(e).orElse(null);
         String hash = u != null ? u.getSenhaHash() : hashFalso;
         boolean ok = encoder.matches(senha, hash);
         if (u == null || !ok) {
+            tentativas.registrarFalha(e);
             throw new CredenciaisInvalidasException();
         }
+        tentativas.limpar(e);
         return u;
     }
 
     private Usuario novo(String email, String senha, PapelUsuario papel) {
+        SenhaPolicy.validar(senha, email);
         Usuario u = new Usuario();
         u.setEmail(email);
         u.setSenhaHash(encoder.encode(senha));

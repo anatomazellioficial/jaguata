@@ -37,7 +37,7 @@ class ApiRestTest {
 
     static final String SENHA = "senha-forte-123";
     static final String ADMIN_EMAIL = "admin@teste.local";
-    static final String ADMIN_SENHA = "admin-senha-de-teste";
+    static final String ADMIN_SENHA = "girassol-azul-teste-42";
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;

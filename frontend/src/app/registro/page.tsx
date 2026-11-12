@@ -78,8 +78,8 @@ function RegistroForm() {
 
       <form onSubmit={submit} className="space-y-4">
         <Field label="E-mail" type="email" autoComplete="email" required value={f.email} onChange={set("email")} error={erros.email} />
-        <Field label="Senha" type="password" autoComplete="new-password" required minLength={8} maxLength={72}
-          hint="Mínimo de 8 caracteres" value={f.senha} onChange={set("senha")} error={erros.senha} />
+        <Field label="Senha" type="password" autoComplete="new-password" required minLength={10} maxLength={72}
+          hint="Mínimo de 10 caracteres. Evite senhas comuns e o seu e-mail." value={f.senha} onChange={set("senha")} error={erros.senha} />
         <Field label="CNPJ" inputMode="numeric" required placeholder="Somente números" value={f.cnpj} onChange={set("cnpj")} error={e("cnpj")} />
         <Field label="Razão social" required value={f.razaoSocial} onChange={set("razaoSocial")} error={e("razaoSocial")} />
         <Field label="CNAE principal" inputMode="numeric" required placeholder="Ex.: 6201501" value={f.cnaePrincipal} onChange={set("cnaePrincipal")} error={e("cnaePrincipal")} />

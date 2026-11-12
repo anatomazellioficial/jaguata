@@ -25,8 +25,8 @@ public class AdminBootstrap implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (email.isBlank() || senha.isBlank()) return;
-        if (senha.length() < 8) {
-            throw new IllegalStateException("ADMIN_PASSWORD deve ter no mínimo 8 caracteres.");
+        if (senha.length() < com.jaguata.plataforma.security.SenhaPolicy.MIN) {
+            throw new IllegalStateException("ADMIN_PASSWORD deve ter no mínimo 10 caracteres.");
         }
         auth.criarAdminSeAusente(email, senha);
     }

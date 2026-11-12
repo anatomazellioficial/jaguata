@@ -15,9 +15,12 @@ public class JwtService {
     private final JwtEncoder encoder;
     private final Duration ttl;
 
-    public JwtService(JwtEncoder encoder, @Value("${app.jwt.ttl:PT1H}") Duration ttl) {
+    private final String issuer;
+
+    public JwtService(JwtEncoder encoder, @Value("${app.jwt.ttl:PT1H}") Duration ttl, SecurityProperties props) {
         this.encoder = encoder;
         this.ttl = ttl;
+        this.issuer = props.jwtIssuer();
     }
 
     public Duration getTtl() {
@@ -27,6 +30,8 @@ public class JwtService {
     public String emitir(Usuario u) {
         Instant agora = Instant.now();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .id(java.util.UUID.randomUUID().toString())
                 .subject(u.getId().toString())
                 .issuedAt(agora)
                 .expiresAt(agora.plus(ttl))

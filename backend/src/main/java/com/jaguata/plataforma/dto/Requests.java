@@ -17,13 +17,13 @@ public final class Requests {
 
     public record RegistroEmpresaRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(min = 8, max = 72, message = "Senha deve ter de 8 a 72 caracteres") String senha,
+            @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
             @NotNull @Valid EmpresaRequest empresa) {
     }
 
     public record RegistroOngRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(min = 8, max = 72, message = "Senha deve ter de 8 a 72 caracteres") String senha,
+            @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
             @NotNull @Valid OngRequest ong) {
     }
 
