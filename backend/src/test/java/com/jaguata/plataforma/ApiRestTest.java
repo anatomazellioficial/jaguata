@@ -109,6 +109,11 @@ class ApiRestTest {
              "cepAtuacao":"01001000"}
             """;
 
+    /** Vaga em Campinas: isola os testes que criam vários candidatos (o banco é compartilhado). */
+    static final String VAGA_CAMPINAS = """
+            {"nivelCargo":"DIRETOR","tipoContrato":"FIXO","modeloTrabalho":"PRESENCIAL","cepAtuacao":"13015904"}
+            """;
+
     // ---------- fluxo feliz ----------
     @Test
     void fluxoCompletoComPapeis() throws Exception {
@@ -405,5 +410,53 @@ class ApiRestTest {
     void vagaInexistenteRetorna404ParaAdmin() throws Exception {
         call(HttpMethod.GET, "/api/vagas/00000000-0000-0000-0000-000000000000", null,
                 login(ADMIN_EMAIL, ADMIN_SENHA)).andExpect(status().isNotFound());
+    }
+
+    // ---------- contratação fecha a vaga (API) ----------
+    @Test
+    void contratarFechaAVagaEBarraCandidatoJaContratado() throws Exception {
+        Conta ong = ongVerificada();
+        Conta empresa = registrarEmpresaME();
+        for (String nome : new String[]{"Ana Lima", "Bia Costa"}) {
+            call(HttpMethod.POST, "/api/ongs/" + ong.id() + "/candidatos",
+                    candidatoJson(30).replace("Maria", nome).replace("01310100", "13015904"), ong.token()).andExpect(status().isCreated());
+        }
+        String vagaA = body(call(HttpMethod.POST, "/api/empresas/" + empresa.id() + "/vagas", VAGA_CAMPINAS, empresa.token())
+                .andExpect(status().isCreated())).get("id").asText();
+
+        JsonNode sugeridos = body(call(HttpMethod.POST, "/api/vagas/" + vagaA + "/matches/sugestoes?raioKm=10", null, empresa.token())
+                .andExpect(status().isCreated()).andExpect(jsonPath("$", hasSize(2))));
+        String primeiro = sugeridos.get(0).get("id").asText();
+        String segundo = sugeridos.get(1).get("id").asText();
+        String candidatoContratado = sugeridos.get(0).get("candidatoId").asText();
+
+        // a ONG envia os dois; a empresa entrevista e contrata o primeiro
+        for (String id : new String[]{primeiro, segundo}) {
+            call(HttpMethod.PATCH, "/api/matches/" + id + "/status", "{\"status\":\"ENVIADO\"}", ong.token()).andExpect(status().isOk());
+        }
+        call(HttpMethod.PATCH, "/api/matches/" + primeiro + "/status", "{\"status\":\"ENTREVISTA\"}", empresa.token()).andExpect(status().isOk());
+        call(HttpMethod.PATCH, "/api/matches/" + primeiro + "/status", "{\"status\":\"CONTRATADO\"}", empresa.token())
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONTRATADO"));
+
+        // a vaga foi preenchida
+        call(HttpMethod.GET, "/api/vagas/" + vagaA, null, empresa.token())
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PREENCHIDA"));
+        // a pendência do outro candidato foi encerrada e não avança mais
+        call(HttpMethod.GET, "/api/ongs/" + ong.id() + "/matches?status=RECUSADO", null, ong.token())
+                .andExpect(jsonPath("$", hasSize(1))).andExpect(jsonPath("$[0].id").value(segundo));
+        call(HttpMethod.GET, "/api/ongs/" + ong.id() + "/matches?status=ENVIADO", null, ong.token())
+                .andExpect(jsonPath("$", hasSize(0)));
+        // vaga fechada não aceita nova busca
+        call(HttpMethod.POST, "/api/vagas/" + vagaA + "/matches/sugestoes?raioKm=10", null, empresa.token())
+                .andExpect(status().isCreated()).andExpect(jsonPath("$", hasSize(0)));
+
+        // o candidato contratado não é sugerido para outra vaga
+        String vagaB = body(call(HttpMethod.POST, "/api/empresas/" + empresa.id() + "/vagas", VAGA_CAMPINAS, empresa.token())
+                .andExpect(status().isCreated())).get("id").asText();
+        JsonNode paraB = body(call(HttpMethod.POST, "/api/vagas/" + vagaB + "/matches/sugestoes?raioKm=10", null, empresa.token())
+                .andExpect(status().isCreated()));
+        for (JsonNode m : paraB) {
+            org.junit.jupiter.api.Assertions.assertNotEquals(candidatoContratado, m.get("candidatoId").asText());
+        }
     }
 }

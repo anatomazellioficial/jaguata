@@ -4,6 +4,7 @@ import com.jaguata.plataforma.domain.Candidato;
 import com.jaguata.plataforma.domain.Match;
 import com.jaguata.plataforma.domain.Vaga;
 import com.jaguata.plataforma.domain.enums.StatusMatch;
+import com.jaguata.plataforma.domain.enums.StatusVaga;
 import com.jaguata.plataforma.exception.RecursoNaoEncontradoException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
 import com.jaguata.plataforma.repository.CandidatoProximo;
@@ -13,6 +14,7 @@ import com.jaguata.plataforma.repository.VagaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -95,6 +97,27 @@ public class MatchService {
             throw new RegraNegocioException(
                     "Transição inválida do funil: " + m.getStatus() + " -> " + destino);
         }
+
+        // só se avança numa vaga aberta (recusar é sempre permitido)
+        boolean avanca = destino == StatusMatch.ENVIADO || destino == StatusMatch.ENTREVISTA
+                || destino == StatusMatch.CONTRATADO;
+        if (avanca && m.getVaga().getStatus() != StatusVaga.ABERTA) {
+            throw new RegraNegocioException("A vaga não está aberta: não é possível avançar este candidato.");
+        }
+
+        if (destino == StatusMatch.CONTRATADO) {
+            if (matches.existsByCandidatoIdAndStatus(m.getCandidato().getId(), StatusMatch.CONTRATADO)) {
+                throw new RegraNegocioException("Este candidato já foi contratado.");
+            }
+            m.setStatus(destino);
+            // contratou: a vaga é preenchida e as demais pendências dela são encerradas
+            m.getVaga().setStatus(StatusVaga.PREENCHIDA);
+            matches.encerrarPendenciasDaVaga(m.getVaga().getId(), m.getId(),
+                    List.of(StatusMatch.SUGERIDO, StatusMatch.ENVIADO, StatusMatch.ENTREVISTA), StatusMatch.RECUSADO,
+                    OffsetDateTime.now());
+            return m;
+        }
+
         m.setStatus(destino);
         return m;
     }

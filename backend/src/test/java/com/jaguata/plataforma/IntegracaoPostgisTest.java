@@ -178,4 +178,85 @@ class IntegracaoPostgisTest {
                 () -> matchService.avancar(m.getId(), StatusMatch.CONTRATADO));
         assertEquals(StatusMatch.ENVIADO, matchService.avancar(m.getId(), StatusMatch.ENVIADO).getStatus());
     }
+
+    // ---------- contratação fecha a vaga ----------
+    @Autowired MatchRepository matchRepo;
+    @Autowired VagaRepository vagaRepo;
+
+    private StatusMatch statusDe(Match m) {
+        return matchRepo.findById(m.getId()).orElseThrow().getStatus();
+    }
+
+    private Match deCandidato(List<Match> ms, Candidato c) {
+        return ms.stream().filter(m -> m.getCandidato().getId().equals(c.getId())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void contratarPreencheAVagaEEncerraAsDemaisPendencias() {
+        Candidato ana = candidato("Ana", 30, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Candidato bia = candidato("Bia", 28, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v = vaga(NivelCargo.ANALISTA, ModeloTrabalho.PRESENCIAL);
+        List<Match> sugestoes = matchService.gerarSugestoes(v.getId(), 10, 50);
+        Match ma = deCandidato(sugestoes, ana);
+        Match mb = deCandidato(sugestoes, bia);
+
+        matchService.avancar(ma.getId(), StatusMatch.ENVIADO);
+        matchService.avancar(ma.getId(), StatusMatch.ENTREVISTA);
+        matchService.avancar(mb.getId(), StatusMatch.ENVIADO);
+        matchService.avancar(ma.getId(), StatusMatch.CONTRATADO);
+        em.flush();
+        em.clear();
+
+        assertEquals(StatusVaga.PREENCHIDA, vagaRepo.findById(v.getId()).orElseThrow().getStatus());
+        assertEquals(StatusMatch.CONTRATADO, statusDe(ma));
+        assertEquals(StatusMatch.RECUSADO, statusDe(mb), "a pendência concorrente da vaga é encerrada");
+    }
+
+    @Test
+    void candidatoContratadoNaoEElegivelParaOutraVaga() {
+        candidato("Ana", 30, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v1 = vaga(NivelCargo.ANALISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v2 = vaga(NivelCargo.ASSISTENTE, ModeloTrabalho.PRESENCIAL);
+        Match m = matchService.gerarSugestoes(v1.getId(), 10, 50).get(0);
+        matchService.avancar(m.getId(), StatusMatch.ENVIADO);
+        matchService.avancar(m.getId(), StatusMatch.ENTREVISTA);
+        matchService.avancar(m.getId(), StatusMatch.CONTRATADO);
+        em.flush();
+        em.clear();
+
+        assertTrue(matchService.gerarSugestoes(v2.getId(), 10, 50).isEmpty());
+    }
+
+    @Test
+    void naoSeContrataDuasVezesOMesmoCandidato() {
+        candidato("Ana", 30, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v1 = vaga(NivelCargo.ANALISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v2 = vaga(NivelCargo.ASSISTENTE, ModeloTrabalho.PRESENCIAL);
+        // as duas sugestões nascem antes de qualquer contratação (corrida entre duas empresas)
+        Match m1 = matchService.gerarSugestoes(v1.getId(), 10, 50).get(0);
+        Match m2 = matchService.gerarSugestoes(v2.getId(), 10, 50).get(0);
+        for (Match m : List.of(m1, m2)) {
+            matchService.avancar(m.getId(), StatusMatch.ENVIADO);
+            matchService.avancar(m.getId(), StatusMatch.ENTREVISTA);
+        }
+        matchService.avancar(m1.getId(), StatusMatch.CONTRATADO);
+        em.flush();
+        em.clear();
+
+        RegraNegocioException e = assertThrows(RegraNegocioException.class,
+                () -> matchService.avancar(m2.getId(), StatusMatch.CONTRATADO));
+        assertTrue(e.getMessage().contains("já foi contratado"));
+    }
+
+    @Test
+    void naoSeAvancaEmVagaForaDoAr() {
+        candidato("Ana", 30, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v = vaga(NivelCargo.ANALISTA, ModeloTrabalho.PRESENCIAL);
+        Match m = matchService.gerarSugestoes(v.getId(), 10, 50).get(0);
+
+        vagaService.alterarStatus(v.getId(), StatusVaga.PAUSADA);
+        assertThrows(RegraNegocioException.class, () -> matchService.avancar(m.getId(), StatusMatch.ENVIADO));
+        // recusar continua permitido
+        assertEquals(StatusMatch.RECUSADO, matchService.avancar(m.getId(), StatusMatch.RECUSADO).getStatus());
+    }
 }

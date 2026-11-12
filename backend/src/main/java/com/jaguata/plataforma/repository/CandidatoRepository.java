@@ -18,7 +18,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
      *   <li>apenas ONGs verificadas e vaga ABERTA;</li>
      *   <li>raio (PostGIS ST_DWithin, em metros) — ignorado para vagas REMOTO;</li>
      *   <li>vaga de APRENDIZ só aceita 18 a 24 anos;</li>
-     *   <li>exclui candidatos que já têm match com a vaga.</li>
+     *   <li>exclui candidatos que já têm match com a vaga;</li>
+     *   <li>exclui candidatos que já foram CONTRATADOS (em qualquer vaga).</li>
      * </ul>
      */
     @Query(nativeQuery = true, value = """
@@ -35,6 +36,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
                     OR c.data_nascimento > (CURRENT_DATE - INTERVAL '25 years'))
                AND NOT EXISTS (SELECT 1 FROM matches m
                                 WHERE m.vaga_id = v.id AND m.candidato_id = c.id)
+               AND NOT EXISTS (SELECT 1 FROM matches h
+                                WHERE h.candidato_id = c.id AND h.status = 'CONTRATADO')
              ORDER BY 2
              LIMIT :limite
             """)

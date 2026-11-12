@@ -29,6 +29,8 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 | **Match por território, perfil e CNAE**: raio em km (PostGIS), modelo de trabalho e CNAE | `MatchService` + `MatchScoreCalculator` |
 | **Funil**: Sugerido → Enviado → Entrevista → Contratado (ou Recusado) | `StatusMatch` + validação de transições |
 | **Só ONGs verificadas** entram em matches | consulta de elegíveis + painel de admin |
+| **Contratar preenche a vaga**: a vaga vira `PREENCHIDA`, as demais pendências dela (sugeridas, enviadas, em entrevista) são encerradas como recusadas e só se avança em vaga aberta | `MatchService.avancar` |
+| **Quem já foi contratado não é sugerido de novo** e não pode ser contratado duas vezes | consulta de elegíveis + `MatchService` |
 
 O *score* (0–100) combina território (50), modelo de trabalho (20) e CNAE (30). A compatibilidade de CNAE hoje é a mesma divisão (2 primeiros dígitos); está isolada em `CnaeCompatibilidade` para ser trocada por uma tabela de afinidade.
 
@@ -152,6 +154,8 @@ Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erro
 | `PATCH /api/matches/{id}/status` | ONG ou empresa (conforme a etapa) | Avança o funil |
 | `GET /api/admin/ongs` · `/resumo` · `POST /api/admin/ongs/{id}/verificar` · `/revogar` | admin | Verificação de ONGs e indicadores |
 
+Contratar é terminal: fecha a vaga (reabra com `PATCH /api/vagas/{id}/status` se precisar de outra contratação; pendências já encerradas não voltam).
+
 Quem move cada etapa do funil: **ONG** → `ENVIADO`; **empresa dona da vaga** → `ENTREVISTA` e `CONTRATADO`; **ambas** → `RECUSADO`.
 
 Códigos relevantes: `400` dados inválidos (inclui CNPJ com dígito verificador errado) · `401` sem/inválido token · `403` sem permissão · `413` corpo grande demais · `404` CNPJ/CEP inexistente · `422` regra de negócio (inclui CNPJ inativo) · `503` Receita/CEP indisponíveis · `429` limite de taxa (cabeçalho `Retry-After`).
@@ -163,7 +167,7 @@ cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS re
 cd frontend && npm run typecheck
 ```
 
-A suíte do backend (75 testes) cobre: regras de negócio, migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+A suíte do backend (80 testes) cobre: regras de negócio, migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
 
 ## Segurança
 
