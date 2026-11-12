@@ -33,12 +33,16 @@ function LoginForm() {
   }
 
   return (
-    <AuthFrame title="Entrar" footer={<>Ainda não tem conta? <Link className="text-brick underline" href="/registro">Cadastre-se</Link></>}>
+    <AuthFrame
+      title="Entrar"
+      subtitle="Bem-vindo de volta."
+      footer={<>Ainda não tem conta? <Link className="font-semibold text-brick hover:underline" href="/registro">Cadastre-se</Link></>}
+    >
       <form onSubmit={submit} className="space-y-4">
         <Field label="E-mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label="Senha" type="password" autoComplete="current-password" required value={senha} onChange={(e) => setSenha(e.target.value)} />
         {erro && <Notice>{erro}</Notice>}
-        <Button type="submit" loading={loading} className="w-full">Entrar</Button>
+        <Button type="submit" loading={loading} className="mt-2 w-full !py-3.5">Entrar</Button>
       </form>
     </AuthFrame>
   );

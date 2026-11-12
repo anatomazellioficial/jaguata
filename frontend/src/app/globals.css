@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Identidade Jaguatá */
+/* Identidade Jaguatá — linguagem visual inspirada em iOS: vidro, raios grandes, sombras suaves */
 @theme {
   --color-navy: #102e50;
   --color-orange: #e78b48;
@@ -8,49 +8,92 @@
   --color-brick: #be3d2a;
   --color-cream: #fbf5ee;
 
-  /* nomes semânticos usados nos componentes */
-  --color-ink: #fbf5ee;     /* fundo da página */
-  --color-paper: #102e50;   /* texto principal */
-  --color-panel: #ffffff;   /* cartões */
-  --color-line: #e6dccd;    /* bordas */
-  --color-mute: #5b6b82;    /* texto secundário (contraste ~5:1 sobre creme) */
-  --color-neon: #f5c45e;    /* destaque amarelo (fundos/abas ativas) */
+  /* nomes semânticos */
+  --color-ink: #fbf5ee;
+  --color-paper: #102e50;
+  --color-panel: #ffffff;
+  --color-line: #e9e0d3;
+  --color-mute: #5b6b82;
+  --color-neon: #f5c45e;
   --color-danger: #be3d2a;
 
-  --font-sans: "Lexend Variable", ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-sans: "Lexend Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgba(16, 46, 80, 0.04), 0 12px 32px -14px rgba(16, 46, 80, 0.16);
+  --shadow-lift: 0 2px 6px rgba(16, 46, 80, 0.05), 0 28px 56px -18px rgba(16, 46, 80, 0.28);
 }
 
 html {
-  background: var(--color-ink);
-  color: var(--color-paper);
+  background: var(--color-cream);
+  color: var(--color-navy);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
 }
 
 body {
   font-family: var(--font-sans);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
-::selection {
-  background: var(--color-orange);
-  color: var(--color-navy);
+/* luz ambiente atrás de tudo */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(52rem 34rem at 92% -8%, rgba(245, 196, 94, 0.38), transparent 62%),
+    radial-gradient(46rem 32rem at -8% 6%, rgba(231, 139, 72, 0.22), transparent 62%),
+    radial-gradient(60rem 36rem at 50% 118%, rgba(16, 46, 80, 0.09), transparent 62%);
 }
 
-.display {
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 0.95;
-  text-transform: uppercase;
+::selection { background: var(--color-orange); color: var(--color-navy); }
+
+/* vidro fosco (materiais do iOS) */
+.glass {
+  background: rgba(255, 255, 255, 0.68);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+  backdrop-filter: saturate(180%) blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: var(--shadow-soft);
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  backdrop-filter: saturate(180%) blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-lift);
 }
 
-@keyframes marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+/* títulos grandes, caixa normal, tracking apertado (SF Pro style) */
+.title { font-weight: 700; letter-spacing: -0.035em; line-height: 1.02; }
+.display { font-weight: 700; letter-spacing: -0.04em; line-height: 0.98; }
+.gradient-text {
+  background: linear-gradient(100deg, #e78b48 0%, #d9602f 45%, #be3d2a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-.marquee { animation: marquee 28s linear infinite; }
+
+.shimmer {
+  background: linear-gradient(100deg, rgba(16,46,80,.05) 30%, rgba(16,46,80,.11) 50%, rgba(16,46,80,.05) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@keyframes ping-slow { 0% { transform: scale(.6); opacity: .55; } 100% { transform: scale(1.6); opacity: 0; } }
+.ping-slow { animation: ping-slow 3.2s cubic-bezier(.22,1,.36,1) infinite; }
+
+:focus-visible { outline: 2px solid var(--color-orange); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .marquee { animation: none; }
   html { scroll-behavior: auto; }
+  .shimmer, .ping-slow { animation: none; }
 }

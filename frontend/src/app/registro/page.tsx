@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, useState } from "react";
 import { AuthFrame } from "@/components/Shell";
-import { Button, Field, Notice, Select } from "@/components/ui";
+import { Button, Field, Notice, Segmented, Select, spring } from "@/components/ui";
 import { ApiError, api, login } from "@/lib/api";
 import { homeFor } from "@/lib/jwt";
 import type { PorteEmpresa } from "@/lib/types";
@@ -66,14 +67,14 @@ function RegistroForm() {
   const e = (k: string) => erros[`${tipo}.${k}`] ?? erros[k];
 
   return (
-    <AuthFrame title="Criar conta" footer={<>Já tem conta? <Link className="text-brick underline" href="/login">Entrar</Link></>}>
-      <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-line p-1" role="tablist">
-        {(["empresa", "ong"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tipo === t} onClick={() => setTipo(t)}
-            className={`rounded-full py-2 text-sm font-bold uppercase tracking-wide transition-colors ${tipo === t ? "bg-neon text-navy" : "text-mute hover:text-paper"}`}>
-            {t === "empresa" ? "Empresa" : "ONG"}
-          </button>
-        ))}
+    <AuthFrame
+      title="Criar conta"
+      subtitle="Leva menos de um minuto."
+      footer={<>Já tem conta? <Link className="font-semibold text-brick hover:underline" href="/login">Entrar</Link></>}
+    >
+      <div className="mb-6 flex justify-center">
+        <Segmented label="Tipo de conta" value={tipo} onChange={setTipo}
+          options={[{ value: "empresa", label: "Sou empresa" }, { value: "ong", label: "Sou ONG" }]} />
       </div>
 
       <form onSubmit={submit} className="space-y-4">
@@ -83,25 +84,38 @@ function RegistroForm() {
         <Field label="CNPJ" inputMode="numeric" required placeholder="Somente números" value={f.cnpj} onChange={set("cnpj")} error={e("cnpj")} />
         <Field label="Razão social" required value={f.razaoSocial} onChange={set("razaoSocial")} error={e("razaoSocial")} />
         <Field label="CNAE principal" inputMode="numeric" required placeholder="Ex.: 6201501" value={f.cnaePrincipal} onChange={set("cnaePrincipal")} error={e("cnaePrincipal")} />
-        {tipo === "empresa" ? (
-          <Select label="Porte (faturamento)" value={f.porteReceita} onChange={set("porteReceita")}>
-            <option value="MEI">MEI</option><option value="ME">ME</option>
-            <option value="EPP">EPP</option><option value="DEMAIS">Demais</option>
-          </Select>
-        ) : (
-          <Select label="Nível de capacidade" value={f.nivelCapacidade} onChange={set("nivelCapacidade")}>
-            <option value="NIVEL_1">Nível 1</option><option value="NIVEL_2">Nível 2</option><option value="NIVEL_3">Nível 3</option>
-          </Select>
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={tipo} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }}>
+            {tipo === "empresa" ? (
+              <Select label="Porte (faturamento)" value={f.porteReceita} onChange={set("porteReceita")}>
+                <option value="MEI">MEI</option><option value="ME">ME</option>
+                <option value="EPP">EPP</option><option value="DEMAIS">Demais</option>
+              </Select>
+            ) : (
+              <Select label="Nível de capacidade" value={f.nivelCapacidade} onChange={set("nivelCapacidade")}>
+                <option value="NIVEL_1">Nível 1</option><option value="NIVEL_2">Nível 2</option><option value="NIVEL_3">Nível 3</option>
+              </Select>
+            )}
+          </motion.div>
+        </AnimatePresence>
         <Field label="CEP" inputMode="numeric" required placeholder="Somente números" value={f.cep} onChange={set("cep")} error={e("cep")} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Latitude" required inputMode="decimal" value={f.lat} onChange={set("lat")} error={e("lat")} />
           <Field label="Longitude" required inputMode="decimal" value={f.lng} onChange={set("lng")} error={e("lng")} />
         </div>
-        <button type="button" onClick={geolocalizar} className="text-xs text-brick underline">Usar minha localização atual</button>
+        <motion.button type="button" onClick={geolocalizar} whileTap={{ scale: 0.96 }} transition={spring}
+          className="rounded-full bg-navy/[.06] px-3.5 py-1.5 text-xs font-semibold text-navy hover:bg-navy/[.1]">
+          📍 Usar minha localização
+        </motion.button>
         {erro && <Notice>{erro}</Notice>}
-        {tipo === "ong" && <Notice kind="info">Sua ONG entra como “não verificada” e só participa de matches após a verificação da equipe.</Notice>}
-        <Button type="submit" loading={loading} className="w-full">Criar conta</Button>
+        <AnimatePresence>
+          {tipo === "ong" && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <Notice kind="info">Sua ONG entra como “não verificada” e só participa de matches após a verificação da equipe.</Notice>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <Button type="submit" loading={loading} className="mt-1 w-full !py-3.5">Criar conta</Button>
       </form>
     </AuthFrame>
   );
