@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
+import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
 import {
   Avatar, Button, Card, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, Stat, StatusBadge, spring,
@@ -99,7 +100,7 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
 }) {
   const [f, setF] = useState({
     nivelCargo: "ANALISTA" as NivelCargo, tipoContrato: "FIXO" as TipoContrato, modeloTrabalho: "PRESENCIAL" as ModeloTrabalho,
-    cepAtuacao: "", lat: "", lng: "",
+    cepAtuacao: "",
   });
   const [erro, setErro] = useState<string>();
   const [erros, setErros] = useState<Record<string, string>>({});
@@ -116,7 +117,7 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
     try {
       await api(`empresas/${empresaId}/vagas`, {
         method: "POST",
-        body: { ...f, cepAtuacao: f.cepAtuacao.replace(/\D/g, ""), lat: Number(f.lat), lng: Number(f.lng) },
+        body: { ...f, cepAtuacao: f.cepAtuacao.replace(/\D/g, "") },   // coordenadas são obtidas no servidor, pelo CEP
       });
       onCriada();
     } catch (err) {
@@ -124,11 +125,6 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
       if (err instanceof ApiError) setErros(err.campos ?? {});
       setLoading(false);
     }
-  }
-
-  function geolocalizar() {
-    navigator.geolocation?.getCurrentPosition((p) =>
-      setF((s) => ({ ...s, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6) })));
   }
 
   return (
@@ -154,15 +150,8 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
       <Select label="Modelo de trabalho" value={f.modeloTrabalho} onChange={set("modeloTrabalho")}>
         {Object.entries(ROTULO_MODELO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </Select>
-      <Field label="CEP de atuação" inputMode="numeric" required value={f.cepAtuacao} onChange={set("cepAtuacao")} error={erros.cepAtuacao} />
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Latitude" required inputMode="decimal" value={f.lat} onChange={set("lat")} error={erros.lat} />
-        <Field label="Longitude" required inputMode="decimal" value={f.lng} onChange={set("lng")} error={erros.lng} />
-      </div>
-      <motion.button type="button" onClick={geolocalizar} whileTap={{ scale: 0.96 }} transition={spring}
-        className="rounded-full bg-navy/[.06] px-3.5 py-1.5 text-xs font-semibold hover:bg-navy/[.1]">
-        📍 Usar minha localização
-      </motion.button>
+      <CepField label="CEP de atuação" value={f.cepAtuacao} error={erros.cepAtuacao}
+        onChange={(v) => setF((s) => ({ ...s, cepAtuacao: v }))} />
       {erro && <Notice>{erro}</Notice>}
       <Button type="submit" loading={loading} className="w-full !py-3.5">Publicar vaga</Button>
     </form>

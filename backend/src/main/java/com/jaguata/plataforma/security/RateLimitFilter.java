@@ -54,7 +54,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         } else {
             Authentication a = SecurityContextHolder.getContext().getAuthentication();
             String key = a != null && a.getPrincipal() instanceof Jwt j ? "user:" + j.getSubject() : "ip:" + ip;
-            r = limiter.tryConsume("api:" + key, cfg.apiPerMinute(), Duration.ofMinutes(1));
+            // consultas externas (CNPJ/CEP) têm balde próprio e mais apertado: a plataforma não pode virar
+            // um proxy aberto para as APIs públicas
+            if (path.startsWith("/api/consulta/")) {
+                r = limiter.tryConsume("consulta:" + key, cfg.consultaPerMinute(), Duration.ofMinutes(1));
+            } else {
+                r = limiter.tryConsume("api:" + key, cfg.apiPerMinute(), Duration.ofMinutes(1));
+            }
         }
 
         if (!r.allowed()) {

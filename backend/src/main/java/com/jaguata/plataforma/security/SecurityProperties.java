@@ -20,6 +20,8 @@ public record SecurityProperties(
             @DefaultValue("5") int registroPerHour,
             /** Requisições por minuto, por usuário autenticado (ou IP). */
             @DefaultValue("120") int apiPerMinute,
+            /** Consultas de CNPJ/CEP por minuto: por usuário autenticado ou, sem token, por IP. */
+            @DefaultValue("30") int consultaPerMinute,
             /**
              * Quantos proxies confiáveis existem na frente da aplicação. 0 = ignora X-Forwarded-For
              * (único valor seguro se o backend for acessível diretamente).

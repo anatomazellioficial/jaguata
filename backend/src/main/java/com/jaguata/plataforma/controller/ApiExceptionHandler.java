@@ -1,6 +1,9 @@
 package com.jaguata.plataforma.controller;
 
+import com.jaguata.plataforma.exception.ConsultaNaoEncontradaException;
 import com.jaguata.plataforma.exception.CredenciaisInvalidasException;
+import com.jaguata.plataforma.exception.EntradaInvalidaException;
+import com.jaguata.plataforma.exception.ServicoExternoException;
 import com.jaguata.plataforma.exception.RecursoNaoEncontradoException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
 import com.jaguata.plataforma.exception.TentativasExcedidasException;
@@ -43,6 +46,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(RegraNegocioException.class)
     ProblemDetail regraNegocio(RegraNegocioException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(ConsultaNaoEncontradaException.class)
+    ProblemDetail consultaNaoEncontrada(ConsultaNaoEncontradaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(EntradaInvalidaException.class)
+    ProblemDetail entradaInvalida(EntradaInvalidaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /** Receita/CEP fora do ar ou lentos: 503, com mensagem genérica (o detalhe técnico fica no log). */
+    @ExceptionHandler(ServicoExternoException.class)
+    ResponseEntity<ProblemDetail> servicoExterno(ServicoExternoException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, "30")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage()));
     }
 
     @ExceptionHandler(CredenciaisInvalidasException.class)

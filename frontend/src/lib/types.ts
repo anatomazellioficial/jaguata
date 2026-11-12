@@ -41,3 +41,13 @@ export const ROTULO_MODELO: Record<ModeloTrabalho, string> = {
 export const ROTULO_STATUS: Record<StatusMatch, string> = {
   SUGERIDO: "Sugerido", ENVIADO: "Enviado", ENTREVISTA: "Entrevista", CONTRATADO: "Contratado", RECUSADO: "Recusado",
 };
+
+export interface ConsultaCnpj {
+  cnpj: string; razaoSocial: string; nomeFantasia: string; cnaePrincipal: string; porte: PorteEmpresa;
+  ativa: boolean; situacao: string; cep: string; logradouro: string; bairro: string; municipio: string; uf: string;
+  naturezaJuridica: string; entidadeSemFinsLucrativos: boolean;
+}
+export interface ConsultaCep {
+  cep: string; logradouro: string; bairro: string; cidade: string; uf: string; lat: number; lng: number;
+  precisao: "CEP" | "RUA" | "CIDADE";
+}

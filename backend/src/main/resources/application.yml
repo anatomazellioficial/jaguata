@@ -29,6 +29,17 @@ app:
     # Opcional: cria o primeiro ADMIN no startup se ainda não existir (senha com no mínimo 10 caracteres).
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+  integracoes:
+    # CNPJ (Receita Federal) e CEP via BrasilAPI; coordenadas de reserva via OpenStreetMap/Nominatim.
+    # Só trafegam CNPJ, CEP e nomes de rua/cidade (dados públicos), nunca dados de usuários.
+    brasil-api-url: ${BRASILAPI_URL:https://brasilapi.com.br}
+    nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
+    user-agent: ${INTEGRACOES_USER_AGENT:jaguata-plataforma/0.1}
+    connect-timeout-ms: ${INTEGRACOES_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${INTEGRACOES_READ_TIMEOUT_MS:6000}
+    nominatim-min-interval-ms: 1100
+    cnpj-cache-hours: ${CNPJ_CACHE_HOURS:24}
+    cep-cache-days: ${CEP_CACHE_DAYS:30}
   security:
     jwt-issuer: ${JWT_ISSUER:jaguata}
     login-max-failures: ${LOGIN_MAX_FAILURES:5}      # falhas seguidas até bloquear a conta
@@ -39,5 +50,6 @@ app:
       login-per-minute: ${RATE_LIMIT_LOGIN_PER_MINUTE:10}      # por IP
       registro-per-hour: ${RATE_LIMIT_REGISTRO_PER_HOUR:5}     # por IP
       api-per-minute: ${RATE_LIMIT_API_PER_MINUTE:120}         # por usuário (ou IP sem token)
+      consulta-per-minute: ${RATE_LIMIT_CONSULTA_PER_MINUTE:30} # consultas de CNPJ/CEP
       # Nº de proxies CONFIÁVEIS na frente do backend. 0 = ignora X-Forwarded-For (seguro por padrão).
       trusted-proxy-hops: ${RATE_LIMIT_TRUSTED_PROXY_HOPS:0}

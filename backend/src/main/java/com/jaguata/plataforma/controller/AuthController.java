@@ -27,14 +27,14 @@ public class AuthController {
     @PostMapping("/registro/empresa")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistroResponse registrarEmpresa(@Valid @RequestBody RegistroEmpresaRequest req) {
-        Usuario u = auth.registrarEmpresa(req.email(), req.senha(), req.empresa());
+        Usuario u = auth.registrarEmpresa(req.email(), req.senha(), req.cnpj());
         return new RegistroResponse(u.getEmpresaId(), u.getEmail(), u.getPapel());
     }
 
     @PostMapping("/registro/ong")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistroResponse registrarOng(@Valid @RequestBody RegistroOngRequest req) {
-        Usuario u = auth.registrarOng(req.email(), req.senha(), req.ong());
+        Usuario u = auth.registrarOng(req.email(), req.senha(), req.cnpj(), req.nivelCapacidade());
         return new RegistroResponse(u.getOngId(), u.getEmail(), u.getPapel());
     }
 

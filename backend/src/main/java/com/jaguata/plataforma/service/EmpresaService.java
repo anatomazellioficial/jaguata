@@ -1,9 +1,10 @@
 package com.jaguata.plataforma.service;
 
 import com.jaguata.plataforma.domain.Empresa;
-import com.jaguata.plataforma.dto.Requests.EmpresaRequest;
 import com.jaguata.plataforma.exception.RecursoNaoEncontradoException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
+import com.jaguata.plataforma.integracao.DadosCnpj;
+import com.jaguata.plataforma.integracao.Localizacao;
 import com.jaguata.plataforma.repository.EmpresaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,23 +20,27 @@ public class EmpresaService {
         this.empresas = empresas;
     }
 
+    public boolean cnpjCadastrado(String cnpj) {
+        return empresas.existsByCnpj(cnpj);
+    }
+
     /**
-     * TODO: integrar com a Receita Federal para obter CNAE e porte pelo faturamento oficial.
-     * Por ora o porte vem no payload.
+     * Razão social, CNAE e porte vêm da Receita Federal e as coordenadas, do CEP da sede: nada disso é
+     * informado pelo usuário. O porte, portanto, nunca depende de número de funcionários.
      */
     @Transactional
-    public Empresa criar(EmpresaRequest r) {
-        if (empresas.existsByCnpj(r.cnpj())) {
+    public Empresa criar(DadosCnpj d, Localizacao loc) {
+        if (empresas.existsByCnpj(d.cnpj())) {
             throw new RegraNegocioException("Já existe empresa cadastrada com este CNPJ.");
         }
         Empresa e = new Empresa();
-        e.setCnpj(r.cnpj());
-        e.setRazaoSocial(r.razaoSocial());
-        e.setCnaePrincipal(r.cnaePrincipal());
-        e.setPorteReceita(r.porteReceita());
-        e.setCep(r.cep());
-        e.setLat(r.lat());
-        e.setLng(r.lng());
+        e.setCnpj(d.cnpj());
+        e.setRazaoSocial(d.razaoSocial());
+        e.setCnaePrincipal(d.cnaePrincipal());
+        e.setPorteReceita(d.porte());
+        e.setCep(loc.cep());
+        e.setLat(loc.lat());
+        e.setLng(loc.lng());
         return empresas.save(e);
     }
 

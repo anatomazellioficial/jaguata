@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -40,11 +41,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.security.rate-limit.login-per-minute=3",
         "app.security.rate-limit.registro-per-hour=2",
         "app.security.rate-limit.api-per-minute=5",
+        "app.security.rate-limit.consulta-per-minute=3",
         "app.security.rate-limit.trusted-proxy-hops=1",
         "app.security.login-max-failures=3",
         "app.security.max-body-bytes=2048"
 })
 @AutoConfigureMockMvc
+@Import(IntegracoesStub.class)
 @Testcontainers
 class SegurancaTest {
 
@@ -68,7 +71,7 @@ class SegurancaTest {
     }
 
     static String cnpj() {
-        return String.format("%014d", ThreadLocalRandom.current().nextLong(10_000_000_000_000L, 99_999_999_999_999L));
+        return TestCnpjs.com("11");
     }
 
     static String email() {
@@ -77,8 +80,7 @@ class SegurancaTest {
 
     static String empresaJson(String email, String senha) {
         return """
-                {"email":"%s","senha":"%s","empresa":{"cnpj":"%s","razaoSocial":"X","cnaePrincipal":"6201501",
-                 "porteReceita":"EPP","cep":"01001000","lat":-23.5,"lng":-46.6}}
+                {"email":"%s","senha":"%s","cnpj":"%s"}
                 """.formatted(email, senha, cnpj());
     }
 
@@ -151,6 +153,18 @@ class SegurancaTest {
         // outro usuário, mesmo IP: balde próprio
         String outro = tokenDeEmpresa("10.4.5");
         call(HttpMethod.GET, "/api/cardapio/cargos", null, outro, "10.4.9.9").andExpect(status().isOk());
+    }
+
+    @Test
+    void consultasExternasTemLimiteProprioPorIp() throws Exception {
+        String cnpj = TestCnpjs.com("11");
+        for (int i = 0; i < 3; i++) {
+            call(HttpMethod.GET, "/api/consulta/cnpj/" + cnpj, null, null, "10.9.0.1").andExpect(status().isOk());
+        }
+        call(HttpMethod.GET, "/api/consulta/cnpj/" + cnpj, null, null, "10.9.0.1")
+                .andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"));
+        // outro IP não é afetado
+        call(HttpMethod.GET, "/api/consulta/cep/01001000", null, null, "10.9.0.2").andExpect(status().isOk());
     }
 
     // ---------- bloqueio de conta ----------

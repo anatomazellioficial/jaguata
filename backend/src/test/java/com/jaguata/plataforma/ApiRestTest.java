@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Fluxo ponta a ponta pela API HTTP (com JWT) contra PostGIS real. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(IntegracoesStub.class)
 @Testcontainers
 class ApiRestTest {
 
@@ -43,8 +45,9 @@ class ApiRestTest {
     @Autowired ObjectMapper json;
 
     // ---------- helpers ----------
+    /** CNPJ válido; o prefixo "11" faz o stub da Receita devolver porte ME. */
     static String cnpj() {
-        return String.format("%014d", ThreadLocalRandom.current().nextLong(10_000_000_000_000L, 99_999_999_999_999L));
+        return TestCnpjs.com("11");
     }
 
     static String email() {
@@ -74,9 +77,8 @@ class ApiRestTest {
     Conta registrarOng() throws Exception {
         String email = email();
         String id = body(call(HttpMethod.POST, "/api/auth/registro/ong", """
-                {"email":"%s","senha":"%s","ong":{"cnpj":"%s","razaoSocial":"ONG Futuro","cnaePrincipal":"6209100",
-                 "nivelCapacidade":"NIVEL_1","cep":"01310100","lat":-23.5614,"lng":-46.6559}}
-                """.formatted(email, SENHA, cnpj()), null).andExpect(status().isCreated())).get("entidadeId").asText();
+                {"email":"%s","senha":"%s","cnpj":"%s","nivelCapacidade":"NIVEL_1"}
+                """.formatted(email, SENHA, TestCnpjs.com("55")), null).andExpect(status().isCreated())).get("entidadeId").asText();
         return new Conta(id, email, login(email, SENHA));
     }
 
@@ -90,22 +92,21 @@ class ApiRestTest {
     Conta registrarEmpresaME() throws Exception {
         String email = email();
         String id = body(call(HttpMethod.POST, "/api/auth/registro/empresa", """
-                {"email":"%s","senha":"%s","empresa":{"cnpj":"%s","razaoSocial":"Tech ME","cnaePrincipal":"6201501",
-                 "porteReceita":"ME","cep":"01001000","lat":-23.5505,"lng":-46.6333}}
+                {"email":"%s","senha":"%s","cnpj":"%s"}
                 """.formatted(email, SENHA, cnpj()), null).andExpect(status().isCreated())).get("entidadeId").asText();
         return new Conta(id, email, login(email, SENHA));
     }
 
     String candidatoJson(int idade) {
         return """
-                {"nomeCompleto":"Maria","dataNascimento":"%s","cep":"01310100","lat":-23.5614,"lng":-46.6559,
+                {"nomeCompleto":"Maria","dataNascimento":"%s","cep":"01310100",
                  "modeloTrabalhoPref":"PRESENCIAL","tags":[{"categoria":"VULNERABILIDADE","tag":"PCD"}]}
                 """.formatted(LocalDate.now().minusYears(idade).minusDays(1));
     }
 
     static final String VAGA_DIRETOR = """
             {"nivelCargo":"DIRETOR","tipoContrato":"FIXO","modeloTrabalho":"PRESENCIAL",
-             "cepAtuacao":"01001000","lat":-23.5505,"lng":-46.6333}
+             "cepAtuacao":"01001000"}
             """;
 
     // ---------- fluxo feliz ----------
@@ -177,8 +178,7 @@ class ApiRestTest {
         Conta e = registrarEmpresaME();
         login(e.email().toUpperCase(), SENHA);
         call(HttpMethod.POST, "/api/auth/registro/empresa", """
-                {"email":"%s","senha":"%s","empresa":{"cnpj":"%s","razaoSocial":"Outra","cnaePrincipal":"6201501",
-                 "porteReceita":"EPP","cep":"01001000","lat":-23.5,"lng":-46.6}}
+                {"email":"%s","senha":"%s","cnpj":"%s"}
                 """.formatted(e.email().toUpperCase(), SENHA, cnpj()), null)
                 .andExpect(status().isUnprocessableEntity());
     }
@@ -186,8 +186,7 @@ class ApiRestTest {
     @Test
     void senhaCurtaEhRejeitada() throws Exception {
         call(HttpMethod.POST, "/api/auth/registro/empresa", """
-                {"email":"%s","senha":"123","empresa":{"cnpj":"%s","razaoSocial":"X","cnaePrincipal":"6201501",
-                 "porteReceita":"EPP","cep":"01001000","lat":-23.5,"lng":-46.6}}
+                {"email":"%s","senha":"123","cnpj":"%s"}
                 """.formatted(email(), cnpj()), null)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.campos.senha").exists());
@@ -197,8 +196,7 @@ class ApiRestTest {
     void cnpjDuplicadoNoRegistroEhRejeitado() throws Exception {
         String c = cnpj();
         String corpo = """
-                {"email":"%s","senha":"%s","empresa":{"cnpj":"%s","razaoSocial":"X","cnaePrincipal":"6201501",
-                 "porteReceita":"EPP","cep":"01001000","lat":-23.5,"lng":-46.6}}
+                {"email":"%s","senha":"%s","cnpj":"%s"}
                 """;
         call(HttpMethod.POST, "/api/auth/registro/empresa", corpo.formatted(email(), SENHA, c), null)
                 .andExpect(status().isCreated());
@@ -260,7 +258,7 @@ class ApiRestTest {
         Conta empresa = registrarEmpresaME();
         call(HttpMethod.POST, "/api/empresas/" + empresa.id() + "/vagas", """
                 {"nivelCargo":"GURU","tipoContrato":"FIXO","modeloTrabalho":"REMOTO",
-                 "cepAtuacao":"01001000","lat":-23.5,"lng":-46.6}
+                 "cepAtuacao":"01001000"}
                 """, empresa.token()).andExpect(status().isBadRequest());
     }
 
@@ -271,6 +269,93 @@ class ApiRestTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(9)))
                 .andExpect(jsonPath("$[0].codigo").value("APRENDIZ"));
+    }
+
+    // ---------- Receita Federal e CEP ----------
+    static String reg(String email, String cnpj) {
+        return """
+                {"email":"%s","senha":"%s","cnpj":"%s"}
+                """.formatted(email, SENHA, cnpj);
+    }
+
+    @Test
+    void cadastroUsaPorteERazaoSocialDaReceitaNuncaDoCliente() throws Exception {
+        String email = email();
+        // o cliente tenta impor porte, razão social, CNAE e coordenadas: tudo é ignorado
+        String id = body(call(HttpMethod.POST, "/api/auth/registro/empresa", """
+                {"email":"%s","senha":"%s","cnpj":"%s",
+                 "porteReceita":"DEMAIS","razaoSocial":"Fraude SA","cnaePrincipal":"0000000","lat":1,"lng":1}
+                """.formatted(email, SENHA, TestCnpjs.com("22")), null).andExpect(status().isCreated())).get("entidadeId").asText();
+        String token = login(email, SENHA);
+        call(HttpMethod.GET, "/api/empresas/" + id, null, token)
+                .andExpect(jsonPath("$.porteReceita").value("EPP"))
+                .andExpect(jsonPath("$.cnaePrincipal").value("6201501"))
+                .andExpect(jsonPath("$.razaoSocial").value(org.hamcrest.Matchers.startsWith("Empresa Teste")));
+    }
+
+    @Test
+    void registroRecusaCnpjInvalidoInativoInexistenteEForaDoAr() throws Exception {
+        call(HttpMethod.POST, "/api/auth/registro/empresa", reg(email(), "12345678000199"), null)
+                .andExpect(status().isBadRequest());                       // dígito verificador errado
+        call(HttpMethod.POST, "/api/auth/registro/empresa", reg(email(), TestCnpjs.com("99")), null)
+                .andExpect(status().isUnprocessableEntity())               // situação BAIXADA
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("baixada")));
+        call(HttpMethod.POST, "/api/auth/registro/empresa", reg(email(), TestCnpjs.com("88")), null)
+                .andExpect(status().isUnprocessableEntity());              // não existe na Receita
+        call(HttpMethod.POST, "/api/auth/registro/empresa", reg(email(), TestCnpjs.com("77")), null)
+                .andExpect(status().isServiceUnavailable())                // Receita fora do ar
+                .andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
+    void registroDeOngUsaDadosDaReceita() throws Exception {
+        Conta ong = registrarOng();
+        call(HttpMethod.GET, "/api/admin/ongs?verificada=false", null, login(ADMIN_EMAIL, ADMIN_SENHA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '" + ong.id() + "')].razaoSocial")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.startsWith("Associação Teste"))));
+    }
+
+    @Test
+    void consultaPublicaDeCnpjDevolveSoDadosPublicos() throws Exception {
+        call(HttpMethod.GET, "/api/consulta/cnpj/" + TestCnpjs.com("33"), null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.porte").value("MEI"))
+                .andExpect(jsonPath("$.ativa").value(true))
+                .andExpect(jsonPath("$.razaoSocial").exists())
+                .andExpect(jsonPath("$.qsa").doesNotExist())
+                .andExpect(jsonPath("$.socios").doesNotExist());
+        call(HttpMethod.GET, "/api/consulta/cnpj/11111111111111", null, null).andExpect(status().isBadRequest());
+        call(HttpMethod.GET, "/api/consulta/cnpj/" + TestCnpjs.com("88"), null, null).andExpect(status().isNotFound());
+        call(HttpMethod.GET, "/api/consulta/cnpj/" + TestCnpjs.com("77"), null, null).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void consultaPublicaDeCepDevolveEnderecoECoordenadas() throws Exception {
+        call(HttpMethod.GET, "/api/consulta/cep/01001000", null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logradouro").value("Praça da Sé"))
+                .andExpect(jsonPath("$.lat").value(-23.5505))
+                .andExpect(jsonPath("$.precisao").value("CEP"));
+        call(HttpMethod.GET, "/api/consulta/cep/0100", null, null).andExpect(status().isBadRequest());
+        call(HttpMethod.GET, "/api/consulta/cep/00000000", null, null).andExpect(status().isNotFound());
+        call(HttpMethod.GET, "/api/consulta/cep/99999999", null, null).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void consultaNaoAceitaMetodosQueMudamEstado() throws Exception {
+        call(HttpMethod.POST, "/api/consulta/cnpj/" + TestCnpjs.com("11"), "{}", null).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cepInexistenteOuInvalidoBarraVagaECandidato() throws Exception {
+        Conta empresa = registrarEmpresaME();
+        Conta ong = registrarOng();
+        call(HttpMethod.POST, "/api/empresas/" + empresa.id() + "/vagas", """
+                {"nivelCargo":"ANALISTA","tipoContrato":"FIXO","modeloTrabalho":"REMOTO","cepAtuacao":"00000000"}
+                """, empresa.token()).andExpect(status().isNotFound());
+        call(HttpMethod.POST, "/api/ongs/" + ong.id() + "/candidatos",
+                candidatoJson(30).replace("01310100", "abc"), ong.token()).andExpect(status().isBadRequest());
     }
 
     // ---------- área admin ----------

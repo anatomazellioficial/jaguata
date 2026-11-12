@@ -74,6 +74,26 @@ public final class Responses {
                                  java.util.Map<StatusMatch, Long> matchesPorStatus) {
     }
 
+    /** Dados públicos do CNPJ (sem quadro societário) para pré-visualização no cadastro. */
+    public record ConsultaCnpjResponse(String cnpj, String razaoSocial, String nomeFantasia, String cnaePrincipal,
+                                       PorteEmpresa porte, boolean ativa, String situacao, String cep,
+                                       String logradouro, String bairro, String municipio, String uf,
+                                       String naturezaJuridica, boolean entidadeSemFinsLucrativos) {
+        public static ConsultaCnpjResponse from(com.jaguata.plataforma.integracao.DadosCnpj d) {
+            return new ConsultaCnpjResponse(d.cnpj(), d.razaoSocial(), d.nomeFantasia(), d.cnaePrincipal(), d.porte(),
+                    d.ativa(), d.situacao(), d.cep(), d.logradouro(), d.bairro(), d.municipio(), d.uf(),
+                    d.naturezaJuridica(), d.entidadeSemFinsLucrativos());
+        }
+    }
+
+    public record ConsultaCepResponse(String cep, String logradouro, String bairro, String cidade, String uf,
+                                      double lat, double lng, String precisao) {
+        public static ConsultaCepResponse from(com.jaguata.plataforma.integracao.Localizacao l) {
+            return new ConsultaCepResponse(l.cep(), l.logradouro(), l.bairro(), l.cidade(), l.uf(), l.lat(), l.lng(),
+                    l.precisao().name());
+        }
+    }
+
     public record TokenResponse(String accessToken, String tokenType, long expiresInSeconds) {
     }
 

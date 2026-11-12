@@ -7,7 +7,10 @@ import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.util.List;
 
-/** Payloads de entrada da API. */
+/**
+ * Payloads de entrada da API. Dados que vêm de fontes oficiais (razão social, CNAE, porte, endereço e
+ * coordenadas) NÃO são aceitos do cliente: o servidor os obtém da Receita Federal e do CEP.
+ */
 public final class Requests {
     private Requests() {
     }
@@ -15,36 +18,18 @@ public final class Requests {
     public record LoginRequest(@NotBlank @Email String email, @NotBlank String senha) {
     }
 
+    /** O CNPJ pode vir formatado ou só com dígitos; o servidor valida e normaliza. */
     public record RegistroEmpresaRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
-            @NotNull @Valid EmpresaRequest empresa) {
+            @NotBlank @Size(max = 18) String cnpj) {
     }
 
     public record RegistroOngRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
-            @NotNull @Valid OngRequest ong) {
-    }
-
-    public record EmpresaRequest(
-            @NotBlank @Pattern(regexp = "\\d{14}", message = "CNPJ deve ter 14 dígitos") String cnpj,
-            @NotBlank String razaoSocial,
-            @NotBlank String cnaePrincipal,
-            @NotNull PorteEmpresa porteReceita,
-            @NotBlank @Pattern(regexp = "\\d{8}", message = "CEP deve ter 8 dígitos") String cep,
-            @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng) {
-    }
-
-    public record OngRequest(
-            @NotBlank @Pattern(regexp = "\\d{14}", message = "CNPJ deve ter 14 dígitos") String cnpj,
-            @NotBlank String razaoSocial,
-            @NotBlank String cnaePrincipal,
-            @NotNull NivelCapacidade nivelCapacidade,
-            @NotBlank @Pattern(regexp = "\\d{8}", message = "CEP deve ter 8 dígitos") String cep,
-            @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng) {
+            @NotBlank @Size(max = 18) String cnpj,
+            @NotNull NivelCapacidade nivelCapacidade) {
     }
 
     public record TagRequest(@NotNull CategoriaTag categoria, @NotBlank @Size(max = 80) String tag) {
@@ -53,9 +38,7 @@ public final class Requests {
     public record CandidatoRequest(
             @NotBlank String nomeCompleto,
             @NotNull @Past LocalDate dataNascimento,
-            @NotBlank @Pattern(regexp = "\\d{8}", message = "CEP deve ter 8 dígitos") String cep,
-            @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng,
+            @NotBlank @Size(max = 9) String cep,
             @NotNull ModeloTrabalho modeloTrabalhoPref,
             @Valid List<TagRequest> tags) {
     }
@@ -64,9 +47,7 @@ public final class Requests {
             @NotNull NivelCargo nivelCargo,
             @NotNull TipoContrato tipoContrato,
             @NotNull ModeloTrabalho modeloTrabalho,
-            @NotBlank @Pattern(regexp = "\\d{8}", message = "CEP deve ter 8 dígitos") String cepAtuacao,
-            @NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
-            @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng) {
+            @NotBlank @Size(max = 9) String cepAtuacao) {
     }
 
     public record StatusVagaRequest(@NotNull StatusVaga status) {

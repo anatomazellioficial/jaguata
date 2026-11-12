@@ -5,6 +5,8 @@ import com.jaguata.plataforma.dto.Requests.CandidatoRequest;
 import com.jaguata.plataforma.dto.Responses.CandidatoResponse;
 import com.jaguata.plataforma.dto.Responses.MatchResponse;
 import com.jaguata.plataforma.dto.Responses.OngResponse;
+import com.jaguata.plataforma.integracao.ConsultaService;
+import com.jaguata.plataforma.integracao.Localizacao;
 import com.jaguata.plataforma.service.CandidatoService;
 import com.jaguata.plataforma.service.CandidatoService.CadastrarCandidatoCommand;
 import com.jaguata.plataforma.service.CandidatoService.TagInput;
@@ -26,11 +28,13 @@ public class OngController {
     private final OngService ongs;
     private final CandidatoService candidatos;
     private final MatchService matches;
+    private final ConsultaService consulta;
 
-    public OngController(OngService ongs, CandidatoService candidatos, MatchService matches) {
+    public OngController(OngService ongs, CandidatoService candidatos, MatchService matches, ConsultaService consulta) {
         this.ongs = ongs;
         this.candidatos = candidatos;
         this.matches = matches;
+        this.consulta = consulta;
     }
 
     @PostMapping("/{id}/verificar")
@@ -45,8 +49,9 @@ public class OngController {
     public CandidatoResponse cadastrarCandidato(@PathVariable UUID id, @Valid @RequestBody CandidatoRequest req) {
         List<TagInput> tags = req.tags() == null ? List.of()
                 : req.tags().stream().map(t -> new TagInput(t.categoria(), t.tag())).toList();
+        Localizacao loc = consulta.cep(req.cep());   // coordenadas vêm do CEP, nunca do cliente
         return CandidatoResponse.from(candidatos.cadastrar(id, new CadastrarCandidatoCommand(
-                req.nomeCompleto(), req.dataNascimento(), req.cep(), req.lat(), req.lng(),
+                req.nomeCompleto(), req.dataNascimento(), loc.cep(), loc.lat(), loc.lng(),
                 req.modeloTrabalhoPref(), tags)));
     }
 

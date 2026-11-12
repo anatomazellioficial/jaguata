@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
+import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
 import { Avatar, Button, Card, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, StatusBadge, spring } from "@/components/ui";
 import { ApiError, api, getSession } from "@/lib/api";
@@ -115,7 +116,7 @@ function Fila({ ongId, novoCadastro }: { ongId: string; novoCadastro: number }) 
 
 function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCadastrado: () => void; onFechar: () => void }) {
   const [f, setF] = useState({
-    nomeCompleto: "", dataNascimento: "", cep: "", lat: "", lng: "", modeloTrabalhoPref: "PRESENCIAL" as ModeloTrabalho,
+    nomeCompleto: "", dataNascimento: "", cep: "", modeloTrabalhoPref: "PRESENCIAL" as ModeloTrabalho,
   });
   const [tags, setTags] = useState<{ categoria: CategoriaTag; tag: string }[]>([]);
   const [novaTag, setNovaTag] = useState({ categoria: "VULNERABILIDADE" as CategoriaTag, tag: "" });
@@ -132,18 +133,13 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
     setNovaTag((s) => ({ ...s, tag: "" }));
   }
 
-  function geolocalizar() {
-    navigator.geolocation?.getCurrentPosition((p) =>
-      setF((s) => ({ ...s, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6) })));
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErro(undefined); setErros({}); setLoading(true);
     try {
       await api(`ongs/${ongId}/candidatos`, {
         method: "POST",
-        body: { ...f, cep: f.cep.replace(/\D/g, ""), lat: Number(f.lat), lng: Number(f.lng), tags },
+        body: { ...f, cep: f.cep.replace(/\D/g, ""), tags },   // coordenadas são obtidas no servidor, pelo CEP
       });
       onCadastrado();
       onFechar();
@@ -159,15 +155,8 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
       <Field label="Nome completo" required value={f.nomeCompleto} onChange={set("nomeCompleto")} error={erros.nomeCompleto} />
       <Field label="Data de nascimento" type="date" required max={maxNascimento()} value={f.dataNascimento}
         onChange={set("dataNascimento")} hint="Apenas maiores de 18 anos." error={erros.dataNascimento} />
-      <Field label="CEP" inputMode="numeric" required value={f.cep} onChange={set("cep")} error={erros.cep} />
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Latitude" required inputMode="decimal" value={f.lat} onChange={set("lat")} error={erros.lat} />
-        <Field label="Longitude" required inputMode="decimal" value={f.lng} onChange={set("lng")} error={erros.lng} />
-      </div>
-      <motion.button type="button" onClick={geolocalizar} whileTap={{ scale: 0.96 }} transition={spring}
-        className="rounded-full bg-navy/[.06] px-3.5 py-1.5 text-xs font-semibold hover:bg-navy/[.1]">
-        📍 Usar minha localização
-      </motion.button>
+      <CepField label="CEP do candidato" value={f.cep} error={erros.cep}
+        onChange={(v) => setF((s) => ({ ...s, cep: v }))} />
       <Select label="Preferência de trabalho" value={f.modeloTrabalhoPref} onChange={set("modeloTrabalhoPref")}>
         {Object.entries(ROTULO_MODELO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </Select>
