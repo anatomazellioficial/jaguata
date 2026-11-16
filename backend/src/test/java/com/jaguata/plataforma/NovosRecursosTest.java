@@ -312,7 +312,9 @@ class NovosRecursosTest {
         for (int i = 1; i <= 3; i++) candidato(ong2, "Dist B" + i, 30, SE, null);
         String v = vaga(emp, SE, null);
 
-        JsonNode lista = corpo(call(HttpMethod.POST, "/api/vagas/" + v + "/matches/sugestoes?raioKm=5&limite=4&distribuir=true",
+        // raio de 1 km: só os candidatos do Sé. Outros testes da classe cadastram gente na Av. Paulista (~3 km),
+        // que entraria na repartição e tornaria o resultado dependente da ordem de execução
+        JsonNode lista = corpo(call(HttpMethod.POST, "/api/vagas/" + v + "/matches/sugestoes?raioKm=1&limite=4&distribuir=true",
                 null, emp.token()).andExpect(status().isCreated()));
         assertEquals(4, lista.size());
         Set<String> ongs = new HashSet<>();
