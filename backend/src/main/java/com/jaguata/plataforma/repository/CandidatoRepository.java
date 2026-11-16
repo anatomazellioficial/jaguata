@@ -1,6 +1,8 @@
 package com.jaguata.plataforma.repository;
 
 import com.jaguata.plataforma.domain.Candidato;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
 
     List<Candidato> findByOngId(UUID ongId);
 
+    Page<Candidato> findByOngIdAndAnonimizadoEmIsNullOrderByNomeCompletoAsc(UUID ongId, Pageable pageable);
+
     /**
      * Candidatos elegíveis para a vaga, ordenados do mais próximo ao mais distante.
      * <ul>
@@ -19,7 +23,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
      *   <li>raio (PostGIS ST_DWithin, em metros) — ignorado para vagas REMOTO;</li>
      *   <li>vaga de APRENDIZ só aceita 18 a 24 anos;</li>
      *   <li>exclui candidatos que já têm match com a vaga;</li>
-     *   <li>exclui candidatos que já foram CONTRATADOS (em qualquer vaga).</li>
+     *   <li>exclui candidatos que já foram CONTRATADOS (em qualquer vaga);</li>
+     *   <li>exclui candidatos anonimizados (direito de eliminação).</li>
      * </ul>
      */
     @Query(nativeQuery = true, value = """
@@ -29,6 +34,7 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
               JOIN ongs o  ON o.id = c.ong_id
               JOIN vagas v ON v.id = :vagaId
              WHERE o.is_verified = TRUE
+               AND c.anonimizado_em IS NULL
                AND v.status = 'ABERTA'
                AND (v.modelo_trabalho = 'REMOTO'
                     OR ST_DWithin(c.localizacao, v.localizacao, :raioMetros))

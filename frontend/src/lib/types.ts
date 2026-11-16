@@ -51,3 +51,19 @@ export interface ConsultaCep {
   cep: string; logradouro: string; bairro: string; cidade: string; uf: string; lat: number; lng: number;
   precisao: "CEP" | "RUA" | "CIDADE";
 }
+
+export interface Pagina<T> { itens: T[]; total: number; pagina: number; tamanho: number }
+export interface CandidatoResumo {
+  id: string; nomeCompleto: string; idade: number; modeloTrabalhoPref: ModeloTrabalho;
+  tags: { categoria: CategoriaTag; tag: string }[]; cadastradoEm: string; consentimentoVersao: string | null;
+}
+export interface ContaDados {
+  id: string; email: string; papel: "EMPRESA" | "ONG" | "ADMIN"; emailVerificado: boolean; criadaEm: string;
+  termosVersao: string | null; termosAceitosEm: string | null; senhaAlteradaEm: string | null; sessoesAtivas: number;
+  empresa: Empresa | null; ong: { id: string; cnpj: string; razaoSocial: string; verified: boolean } | null;
+}
+export interface Auditoria {
+  id: string; quando: string; usuarioId: string | null; papel: string | null; acao: string;
+  entidade: string | null; entidadeId: string | null; detalhe: string | null;
+}
+export const VERSAO_TERMOS = "2026-11";

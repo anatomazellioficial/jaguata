@@ -2,7 +2,10 @@ package com.jaguata.plataforma.controller;
 
 import com.jaguata.plataforma.domain.enums.StatusMatch;
 import com.jaguata.plataforma.domain.enums.StatusVaga;
+import com.jaguata.plataforma.conta.AuditoriaService;
 import com.jaguata.plataforma.dto.Responses.AdminOngResponse;
+import com.jaguata.plataforma.dto.Responses.AuditoriaResponse;
+import com.jaguata.plataforma.dto.Responses.PaginaResponse;
 import com.jaguata.plataforma.dto.Responses.ResumoResponse;
 import com.jaguata.plataforma.repository.*;
 import com.jaguata.plataforma.service.OngService;
@@ -27,9 +30,12 @@ public class AdminController {
     private final CandidatoRepository candidatoRepo;
     private final VagaRepository vagaRepo;
     private final MatchRepository matchRepo;
+    private final AuditoriaService auditoria;
 
     public AdminController(OngService ongs, OngRepository ongRepo, EmpresaRepository empresaRepo,
-                           CandidatoRepository candidatoRepo, VagaRepository vagaRepo, MatchRepository matchRepo) {
+                           CandidatoRepository candidatoRepo, VagaRepository vagaRepo, MatchRepository matchRepo,
+                           AuditoriaService auditoria) {
+        this.auditoria = auditoria;
         this.ongs = ongs;
         this.ongRepo = ongRepo;
         this.empresaRepo = empresaRepo;
@@ -52,6 +58,14 @@ public class AdminController {
     @PostMapping("/ongs/{id}/revogar")
     public AdminOngResponse revogar(@PathVariable UUID id) {
         return AdminOngResponse.from(ongs.revogarVerificacao(id));
+    }
+
+    /** Trilha de auditoria (mais recentes primeiro); filtre por ação, ex.: ?acao=CANDIDATO_EXPORTADO. */
+    @GetMapping("/auditoria")
+    public PaginaResponse<AuditoriaResponse> auditoria(@RequestParam(required = false) String acao,
+                                                       @RequestParam(defaultValue = "0") int pagina,
+                                                       @RequestParam(defaultValue = "50") int tamanho) {
+        return PaginaResponse.de(auditoria.listar(acao, pagina, tamanho).map(AuditoriaResponse::from));
     }
 
     @GetMapping("/resumo")

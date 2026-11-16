@@ -1,24 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Suspense, useState } from "react";
 import { CnpjField } from "@/components/Lookups";
 import { AuthFrame } from "@/components/Shell";
-import { Button, Field, Notice, Segmented, Select } from "@/components/ui";
-import { ApiError, api, login } from "@/lib/api";
-import { homeFor } from "@/lib/jwt";
+import { Button, Field, Notice, Segmented, Select, spring } from "@/components/ui";
+import { ApiError, api } from "@/lib/api";
 
 function RegistroForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [tipo, setTipo] = useState<"empresa" | "ong">(params.get("tipo") === "ong" ? "ong" : "empresa");
   const [f, setF] = useState({ email: "", senha: "", cnpj: "", nivelCapacidade: "NIVEL_1" });
+  const [aceite, setAceite] = useState(false);
   const [cnpjOk, setCnpjOk] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [erro, setErro] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const [concluido, setConcluido] = useState<string>();
+  const [reenvio, setReenvio] = useState<string>();
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF((s) => ({ ...s, [k]: e.target.value }));
@@ -32,18 +33,46 @@ function RegistroForm() {
       // Só o CNPJ vai ao servidor: razão social, CNAE, porte e endereço vêm da Receita Federal.
       await api(`auth/registro/${tipo}`, {
         method: "POST",
-        body: { email: f.email, senha: f.senha, cnpj: f.cnpj, ...(tipo === "ong" ? { nivelCapacidade: f.nivelCapacidade } : {}) },
+        body: {
+          email: f.email, senha: f.senha, cnpj: f.cnpj, aceiteTermos: aceite,
+          ...(tipo === "ong" ? { nivelCapacidade: f.nivelCapacidade } : {}),
+        },
       });
-      const s = await login(f.email, f.senha);
-      router.push(homeFor(s.papel));
-      router.refresh();
+      setConcluido(f.email);   // o login só é liberado depois de confirmar o e-mail
     } catch (err) {
       if (err instanceof ApiError) {
         setErro(err.message);
         setErros(err.campos ?? {});
       } else setErro("Não foi possível concluir o cadastro.");
+    } finally {
       setLoading(false);
     }
+  }
+
+  async function reenviar() {
+    try {
+      await api("auth/email/reenviar", { method: "POST", body: { email: concluido } });
+      setReenvio("Novo link enviado (se o anterior ainda não foi usado).");
+    } catch (err) {
+      setReenvio(err instanceof ApiError ? err.message : "Não foi possível reenviar agora.");
+    }
+  }
+
+  if (concluido) {
+    return (
+      <AuthFrame title="Confirme seu e-mail" footer={<>Já confirmou? <Link className="font-semibold text-brick hover:underline" href="/login">Entrar</Link></>}>
+        <div className="space-y-5 text-center">
+          <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 240, damping: 14 }}
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sun/60 text-3xl">✉️</motion.div>
+          <p className="text-mute">
+            Enviamos um link para <strong className="text-navy">{concluido}</strong>. Abra-o para ativar a conta. O link vale por 24 horas.
+          </p>
+          {tipo === "ong" && <Notice kind="info">Depois, a verificação da sua ONG pela equipe libera as sugestões de candidatos.</Notice>}
+          <Button variant="ghost" className="w-full" onClick={reenviar}>Reenviar e-mail</Button>
+          {reenvio && <Notice kind="ok">{reenvio}</Notice>}
+        </div>
+      </AuthFrame>
+    );
   }
 
   return (
@@ -77,9 +106,19 @@ function RegistroForm() {
           )}
         </AnimatePresence>
 
+        <label className="flex cursor-pointer items-start gap-3 text-sm">
+          <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-[#e78b48]" />
+          <span>
+            Li e aceito os <Link href="/termos" target="_blank" className="font-semibold text-brick underline">Termos de Uso</Link> e a{" "}
+            <Link href="/privacidade" target="_blank" className="font-semibold text-brick underline">Política de Privacidade</Link>.
+          </span>
+        </label>
+        {erros.aceiteTermos && <Notice>{erros.aceiteTermos}</Notice>}
+
         {erro && <Notice>{erro}</Notice>}
-        <Button type="submit" loading={loading} disabled={!cnpjOk} className="mt-1 w-full !py-3.5">Criar conta</Button>
-        {!cnpjOk && f.cnpj.length === 14 ? null : null}
+        <Button type="submit" loading={loading} disabled={!cnpjOk || !aceite} className="mt-1 w-full !py-3.5">Criar conta</Button>
+        <motion.span transition={spring} />
       </form>
     </AuthFrame>
   );

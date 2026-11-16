@@ -3,7 +3,10 @@ package com.jaguata.plataforma.controller;
 import com.jaguata.plataforma.exception.ConsultaNaoEncontradaException;
 import com.jaguata.plataforma.exception.CredenciaisInvalidasException;
 import com.jaguata.plataforma.exception.EntradaInvalidaException;
+import com.jaguata.plataforma.exception.EmailNaoVerificadoException;
 import com.jaguata.plataforma.exception.ServicoExternoException;
+import com.jaguata.plataforma.exception.SessaoInvalidaException;
+import com.jaguata.plataforma.exception.TokenInvalidoException;
 import com.jaguata.plataforma.exception.RecursoNaoEncontradoException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
 import com.jaguata.plataforma.exception.TentativasExcedidasException;
@@ -64,6 +67,24 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header(HttpHeaders.RETRY_AFTER, "30")
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage()));
+    }
+
+    @ExceptionHandler(TokenInvalidoException.class)
+    ProblemDetail tokenInvalido(TokenInvalidoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(SessaoInvalidaException.class)
+    ProblemDetail sessaoInvalida(SessaoInvalidaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    /** 403 com código estável para o frontend oferecer o reenvio do link de verificação. */
+    @ExceptionHandler(EmailNaoVerificadoException.class)
+    ProblemDetail emailNaoVerificado(EmailNaoVerificadoException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setProperty("codigo", "EMAIL_NAO_VERIFICADO");
+        return pd;
     }
 
     @ExceptionHandler(CredenciaisInvalidasException.class)

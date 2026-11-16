@@ -21,6 +21,13 @@ import org.springframework.context.annotation.Primary;
 @TestConfiguration
 public class IntegracoesStub {
 
+    /** E-mails não saem do teste: ficam capturados para extrair os tokens dos links. */
+    @Bean
+    @Primary
+    CapturaEmails capturaEmails() {
+        return new CapturaEmails();
+    }
+
     @Bean
     @Primary
     ReceitaClient receitaStub() {

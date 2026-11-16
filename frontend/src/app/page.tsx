@@ -340,6 +340,11 @@ export default function Home() {
 
       <footer className="border-t border-navy/5 py-10 text-center text-sm text-mute">
         © {new Date().getFullYear()} Jaguatá · Empregabilidade em rede, ODS 8.
+        <span className="mt-2 block text-xs">
+          <Link href="/termos" className="hover:text-navy hover:underline">Termos de Uso</Link>
+          {" · "}
+          <Link href="/privacidade" className="hover:text-navy hover:underline">Privacidade</Link>
+        </span>
       </footer>
     </main>
   );

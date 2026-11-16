@@ -39,6 +39,22 @@ public class Usuario {
     @Column(name = "ong_id")
     private UUID ongId;
 
+    @Column(name = "email_verificado", nullable = false)
+    private boolean emailVerificado = false;
+
+    @Column(name = "email_verificado_em")
+    private OffsetDateTime emailVerificadoEm;
+
+    /** Versão dos Termos de Uso/Política de Privacidade aceita no cadastro. */
+    @Column(name = "termos_versao", length = 20)
+    private String termosVersao;
+
+    @Column(name = "termos_aceitos_em")
+    private OffsetDateTime termosAceitosEm;
+
+    @Column(name = "senha_alterada_em")
+    private OffsetDateTime senhaAlteradaEm;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

@@ -5,8 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
 import { Avatar, Button, Card, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, StatusBadge, spring } from "@/components/ui";
-import { ApiError, api, getSession } from "@/lib/api";
-import { ROTULO_MODELO, ROTULO_STATUS, type CategoriaTag, type Match, type ModeloTrabalho, type StatusMatch } from "@/lib/types";
+import Link from "next/link";
+import { ApiError, api, baixar, getSession } from "@/lib/api";
+import {
+  ROTULO_MODELO, ROTULO_STATUS,
+  type CandidatoResumo, type CategoriaTag, type Match, type ModeloTrabalho, type Pagina, type StatusMatch,
+} from "@/lib/types";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 const ABAS = (Object.keys(ROTULO_STATUS) as StatusMatch[]).map((s) => ({ value: s, label: ROTULO_STATUS[s] }));
@@ -22,6 +26,7 @@ export default function OngPage() {
   const [erro, setErro] = useState<string>();
   const [sheet, setSheet] = useState(false);
   const [cadastrados, setCadastrados] = useState(0);
+  const [secao, setSecao] = useState<"funil" | "candidatos">("funil");
 
   useEffect(() => {
     getSession()
@@ -36,7 +41,14 @@ export default function OngPage() {
       action={ongId ? <Button size="sm" onClick={() => setSheet(true)}>＋ Novo candidato</Button> : undefined}
     >
       {erro && <Notice>{erro}</Notice>}
-      {ongId && <Fila ongId={ongId} novoCadastro={cadastrados} />}
+      {ongId && (
+        <div className="mb-8">
+          <Segmented label="Seção" value={secao} onChange={setSecao}
+            options={[{ value: "funil", label: "Funil" }, { value: "candidatos", label: "Meus candidatos" }]} />
+        </div>
+      )}
+      {ongId && secao === "funil" && <Fila ongId={ongId} novoCadastro={cadastrados} />}
+      {ongId && secao === "candidatos" && <ListaCandidatos ongId={ongId} atualizar={cadastrados} />}
       {ongId && (
         <Sheet open={sheet} onClose={() => setSheet(false)} title="Novo candidato">
           <NovoCandidato ongId={ongId} onCadastrado={() => setCadastrados((n) => n + 1)} onFechar={() => setSheet(false)} />
@@ -114,12 +126,95 @@ function Fila({ ongId, novoCadastro }: { ongId: string; novoCadastro: number }) 
   );
 }
 
+function ListaCandidatos({ ongId, atualizar }: { ongId: string; atualizar: number }) {
+  const [pagina, setPagina] = useState(0);
+  const [dados, setDados] = useState<Pagina<CandidatoResumo>>();
+  const [erro, setErro] = useState<string>();
+  const [confirmar, setConfirmar] = useState<string>();
+  const [busy, setBusy] = useState<string>();
+  const TAM = 10;
+
+  const carregar = useCallback(async () => {
+    setDados(await api<Pagina<CandidatoResumo>>(`ongs/${ongId}/candidatos?pagina=${pagina}&tamanho=${TAM}`));
+  }, [ongId, pagina]);
+  useEffect(() => { carregar().catch((e) => setErro(msg(e))); }, [carregar, atualizar]);
+
+  async function exportar(c: CandidatoResumo) {
+    setErro(undefined);
+    try { await baixar(`ongs/${ongId}/candidatos/${c.id}/dados`, `candidato-${c.id.slice(0, 8)}.json`); }
+    catch (e) { setErro(msg(e)); }
+  }
+
+  async function anonimizar(c: CandidatoResumo) {
+    setBusy(c.id); setErro(undefined); setConfirmar(undefined);
+    try { await api(`ongs/${ongId}/candidatos/${c.id}`, { method: "DELETE" }); await carregar(); }
+    catch (e) { setErro(msg(e)); } finally { setBusy(undefined); }
+  }
+
+  const paginas = dados ? Math.max(1, Math.ceil(dados.total / TAM)) : 1;
+
+  return (
+    <section>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <h2 className="title text-3xl">Candidatos{dados ? ` (${dados.total})` : ""}</h2>
+        <p className="max-w-md text-sm text-mute">
+          A pedido do(a) assistido(a), exporte os dados dele(a) ou anonimize-os (LGPD). Cada ação fica registrada na auditoria.{" "}
+          <Link href="/privacidade" className="font-semibold text-brick underline">Saiba mais</Link>
+        </p>
+      </div>
+      {erro && <div className="mb-4"><Notice>{erro}</Notice></div>}
+      {!dados && <div className="space-y-3"><Skeleton className="h-24" /><Skeleton className="h-24" /></div>}
+      {dados && dados.itens.length === 0 && (
+        <Card className="px-6 py-14 text-center"><p className="text-mute">Nenhum candidato cadastrado ainda. Use “＋ Novo candidato”.</p></Card>
+      )}
+      <ul className="space-y-3">
+        <AnimatePresence initial={false} mode="popLayout">
+          {dados?.itens.map((c, i) => (
+            <motion.li key={c.id} layout initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -40, scale: 0.97 }} transition={{ ...spring, delay: Math.min(i * 0.04, 0.25) }}
+              className="glass flex flex-wrap items-center gap-4 rounded-[26px] p-4 sm:p-5">
+              <Avatar name={c.nomeCompleto} size={48} />
+              <div className="min-w-[10rem] flex-1">
+                <p className="truncate text-lg font-semibold tracking-tight">{c.nomeCompleto}</p>
+                <p className="text-sm text-mute">{c.idade} anos · {ROTULO_MODELO[c.modeloTrabalhoPref]}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {c.tags.map((t) => <span key={t.categoria + t.tag} className="rounded-full bg-sun/50 px-2.5 py-0.5 text-xs font-semibold">{t.tag}</span>)}
+                </div>
+              </div>
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                <Button size="sm" variant="ghost" onClick={() => exportar(c)}>Exportar dados</Button>
+                {confirmar !== c.id ? (
+                  <Button size="sm" variant="danger" onClick={() => setConfirmar(c.id)}>Anonimizar</Button>
+                ) : (
+                  <>
+                    <span className="basis-full text-right text-xs text-mute sm:basis-auto sm:max-w-[14rem]">Apaga nome, nascimento e CEP. Não dá para desfazer.</span>
+                    <Button size="sm" variant="danger" loading={busy === c.id} onClick={() => anonimizar(c)}>Confirmar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmar(undefined)}>Cancelar</Button>
+                  </>
+                )}
+              </div>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+      {dados && paginas > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>← Anterior</Button>
+          <span className="text-sm text-mute">Página {pagina + 1} de {paginas}</span>
+          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima →</Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCadastrado: () => void; onFechar: () => void }) {
   const [f, setF] = useState({
     nomeCompleto: "", dataNascimento: "", cep: "", modeloTrabalhoPref: "PRESENCIAL" as ModeloTrabalho,
   });
   const [tags, setTags] = useState<{ categoria: CategoriaTag; tag: string }[]>([]);
   const [novaTag, setNovaTag] = useState({ categoria: "VULNERABILIDADE" as CategoriaTag, tag: "" });
+  const [consentimento, setConsentimento] = useState(false);
   const [erro, setErro] = useState<string>();
   const [erros, setErros] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -139,7 +234,7 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
     try {
       await api(`ongs/${ongId}/candidatos`, {
         method: "POST",
-        body: { ...f, cep: f.cep.replace(/\D/g, ""), tags },   // coordenadas são obtidas no servidor, pelo CEP
+        body: { ...f, cep: f.cep.replace(/\D/g, ""), tags, consentimentoConfirmado: consentimento },   // coordenadas são obtidas no servidor, pelo CEP
       });
       onCadastrado();
       onFechar();
@@ -191,8 +286,18 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
         </div>
       </fieldset>
 
+      <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-navy/[.04] p-4 text-sm">
+        <input type="checkbox" checked={consentimento} onChange={(e) => setConsentimento(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[#e78b48]" />
+        <span>
+          Declaro que o(a) assistido(a) leu e assinou o{" "}
+          <Link href="/termos#consentimento" target="_blank" className="font-semibold text-brick underline">termo de consentimento</Link>{" "}
+          para o tratamento dos seus dados. Esta confirmação fica registrada com a data e o meu usuário.
+        </span>
+      </label>
+      {erros.consentimentoConfirmado && <Notice>{erros.consentimentoConfirmado}</Notice>}
       {erro && <Notice>{erro}</Notice>}
-      <Button type="submit" loading={loading} className="w-full !py-3.5">Cadastrar candidato</Button>
+      <Button type="submit" loading={loading} disabled={!consentimento} className="w-full !py-3.5">Cadastrar candidato</Button>
     </form>
   );
 }

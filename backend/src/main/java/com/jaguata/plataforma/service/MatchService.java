@@ -29,9 +29,12 @@ public class MatchService {
     private final MatchRepository matches;
     private final MatchScoreCalculator score;
     private final CnaeCompatibilidade cnae;
+    private final com.jaguata.plataforma.conta.AuditoriaService auditoria;
 
     public MatchService(VagaRepository vagas, CandidatoRepository candidatos, MatchRepository matches,
-                        MatchScoreCalculator score, CnaeCompatibilidade cnae) {
+                        MatchScoreCalculator score, CnaeCompatibilidade cnae,
+                        com.jaguata.plataforma.conta.AuditoriaService auditoria) {
+        this.auditoria = auditoria;
         this.vagas = vagas;
         this.candidatos = candidatos;
         this.matches = matches;
@@ -110,6 +113,7 @@ public class MatchService {
                 throw new RegraNegocioException("Este candidato já foi contratado.");
             }
             m.setStatus(destino);
+            auditoria.registrarComoAtual("MATCH_CONTRATADO", "match", m.getId(), "vaga preenchida");
             // contratou: a vaga é preenchida e as demais pendências dela são encerradas
             m.getVaga().setStatus(StatusVaga.PREENCHIDA);
             matches.encerrarPendenciasDaVaga(m.getVaga().getId(), m.getId(),
@@ -119,6 +123,7 @@ public class MatchService {
         }
 
         m.setStatus(destino);
+        auditoria.registrarComoAtual("MATCH_" + destino.name(), "match", m.getId(), null);
         return m;
     }
 }

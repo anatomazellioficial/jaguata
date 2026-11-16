@@ -43,6 +43,7 @@ class ApiRestTest {
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
+    @Autowired CapturaEmails emails;
 
     // ---------- helpers ----------
     /** CNPJ válido; o prefixo "11" faz o stub da Receita devolver porte ME. */
@@ -56,6 +57,9 @@ class ApiRestTest {
 
     ResultActions call(HttpMethod m, String url, String body, String token) throws Exception {
         MockHttpServletRequestBuilder b = MockMvcRequestBuilders.request(m, url);
+        if (body != null && url.startsWith("/api/auth/registro/") && !body.contains("aceiteTermos")) {
+            body = body.replaceFirst("\\{", "{\"aceiteTermos\":true,");
+        }
         if (body != null) b.contentType(MediaType.APPLICATION_JSON).content(body);
         if (token != null) b.header("Authorization", "Bearer " + token);
         return mvc.perform(b);
@@ -63,6 +67,14 @@ class ApiRestTest {
 
     JsonNode body(ResultActions r) throws Exception {
         return json.readTree(r.andReturn().getResponse().getContentAsString());
+    }
+
+    /** Confirma o e-mail usando o link que o sistema "enviou" (capturado). */
+    void verificar(String email) throws Exception {
+        String token = emails.ultimoToken(email, "verificar-email");
+        org.junit.jupiter.api.Assertions.assertNotNull(token, "e-mail de verificação não foi enviado para " + email);
+        call(HttpMethod.POST, "/api/auth/email/verificar", "{\"token\":\"" + token + "\"}", null)
+                .andExpect(status().isNoContent());
     }
 
     String login(String email, String senha) throws Exception {
@@ -79,6 +91,7 @@ class ApiRestTest {
         String id = body(call(HttpMethod.POST, "/api/auth/registro/ong", """
                 {"email":"%s","senha":"%s","cnpj":"%s","nivelCapacidade":"NIVEL_1"}
                 """.formatted(email, SENHA, TestCnpjs.com("55")), null).andExpect(status().isCreated())).get("entidadeId").asText();
+        verificar(email);
         return new Conta(id, email, login(email, SENHA));
     }
 
@@ -94,13 +107,15 @@ class ApiRestTest {
         String id = body(call(HttpMethod.POST, "/api/auth/registro/empresa", """
                 {"email":"%s","senha":"%s","cnpj":"%s"}
                 """.formatted(email, SENHA, cnpj()), null).andExpect(status().isCreated())).get("entidadeId").asText();
+        verificar(email);
         return new Conta(id, email, login(email, SENHA));
     }
 
     String candidatoJson(int idade) {
         return """
                 {"nomeCompleto":"Maria","dataNascimento":"%s","cep":"01310100",
-                 "modeloTrabalhoPref":"PRESENCIAL","tags":[{"categoria":"VULNERABILIDADE","tag":"PCD"}]}
+                 "modeloTrabalhoPref":"PRESENCIAL","tags":[{"categoria":"VULNERABILIDADE","tag":"PCD"}],
+                 "consentimentoConfirmado":true}
                 """.formatted(LocalDate.now().minusYears(idade).minusDays(1));
     }
 
@@ -291,6 +306,7 @@ class ApiRestTest {
                 {"email":"%s","senha":"%s","cnpj":"%s",
                  "porteReceita":"DEMAIS","razaoSocial":"Fraude SA","cnaePrincipal":"0000000","lat":1,"lng":1}
                 """.formatted(email, SENHA, TestCnpjs.com("22")), null).andExpect(status().isCreated())).get("entidadeId").asText();
+        verificar(email);
         String token = login(email, SENHA);
         call(HttpMethod.GET, "/api/empresas/" + id, null, token)
                 .andExpect(jsonPath("$.porteReceita").value("EPP"))

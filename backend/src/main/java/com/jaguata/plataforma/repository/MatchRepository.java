@@ -24,6 +24,19 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     long countByStatus(StatusMatch status);
 
+    @EntityGraph(attributePaths = {"vaga"})
+    List<Match> findByCandidatoIdOrderByCreatedAtDesc(UUID candidatoId);
+
+    /** Candidato anonimizado: encerra as pendências abertas dele. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Match m set m.status = :novo, m.updatedAt = :agora
+             where m.candidato.id = :candidatoId and m.status in :abertos
+            """)
+    int encerrarPendenciasDoCandidato(@Param("candidatoId") UUID candidatoId,
+                                      @Param("abertos") Collection<StatusMatch> abertos,
+                                      @Param("novo") StatusMatch novo, @Param("agora") OffsetDateTime agora);
+
     boolean existsByCandidatoIdAndStatus(UUID candidatoId, StatusMatch status);
 
     /**

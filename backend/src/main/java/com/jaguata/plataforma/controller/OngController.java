@@ -2,7 +2,10 @@ package com.jaguata.plataforma.controller;
 
 import com.jaguata.plataforma.domain.enums.StatusMatch;
 import com.jaguata.plataforma.dto.Requests.CandidatoRequest;
+import com.jaguata.plataforma.dto.Responses.CandidatoExportacaoResponse;
+import com.jaguata.plataforma.dto.Responses.CandidatoResumoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResponse;
+import com.jaguata.plataforma.dto.Responses.PaginaResponse;
 import com.jaguata.plataforma.dto.Responses.MatchResponse;
 import com.jaguata.plataforma.dto.Responses.OngResponse;
 import com.jaguata.plataforma.integracao.ConsultaService;
@@ -15,6 +18,8 @@ import com.jaguata.plataforma.service.OngService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,13 +51,38 @@ public class OngController {
     @PostMapping("/{id}/candidatos")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("@acesso.ong(#id)")
-    public CandidatoResponse cadastrarCandidato(@PathVariable UUID id, @Valid @RequestBody CandidatoRequest req) {
+    public CandidatoResponse cadastrarCandidato(@PathVariable UUID id, @Valid @RequestBody CandidatoRequest req,
+                                                @AuthenticationPrincipal Jwt jwt) {
         List<TagInput> tags = req.tags() == null ? List.of()
                 : req.tags().stream().map(t -> new TagInput(t.categoria(), t.tag())).toList();
         Localizacao loc = consulta.cep(req.cep());   // coordenadas vêm do CEP, nunca do cliente
         return CandidatoResponse.from(candidatos.cadastrar(id, new CadastrarCandidatoCommand(
                 req.nomeCompleto(), req.dataNascimento(), loc.cep(), loc.lat(), loc.lng(),
-                req.modeloTrabalhoPref(), tags)));
+                req.modeloTrabalhoPref(), tags), UUID.fromString(jwt.getSubject())));
+    }
+
+    /** Candidatos ativos da ONG (os anonimizados não aparecem). */
+    @GetMapping("/{id}/candidatos")
+    @PreAuthorize("@acesso.ong(#id)")
+    public PaginaResponse<CandidatoResumoResponse> listarCandidatos(@PathVariable UUID id,
+                                                                    @RequestParam(defaultValue = "0") int pagina,
+                                                                    @RequestParam(defaultValue = "20") int tamanho) {
+        return PaginaResponse.de(candidatos.listar(id, pagina, tamanho));
+    }
+
+    /** Direito de acesso/portabilidade: todos os dados do candidato (registra auditoria). */
+    @GetMapping("/{id}/candidatos/{candidatoId}/dados")
+    @PreAuthorize("@acesso.ong(#id)")
+    public CandidatoExportacaoResponse exportarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId) {
+        return candidatos.exportar(id, candidatoId);
+    }
+
+    /** Direito de eliminação: anonimiza os dados pessoais do candidato (registra auditoria). */
+    @DeleteMapping("/{id}/candidatos/{candidatoId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@acesso.ong(#id)")
+    public void anonimizarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId) {
+        candidatos.anonimizar(id, candidatoId);
     }
 
     /** Fila da ONG: por padrão, os matches SUGERIDOS aguardando envio. */

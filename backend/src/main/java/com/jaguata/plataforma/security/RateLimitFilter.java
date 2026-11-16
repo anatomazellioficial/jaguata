@@ -49,6 +49,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         RateLimiter.Result r;
         if (post && path.equals("/api/auth/login")) {
             r = limiter.tryConsume("login:" + ip, cfg.loginPerMinute(), Duration.ofMinutes(1));
+        } else if (post && (path.startsWith("/api/auth/senha/") || path.startsWith("/api/auth/email/"))) {
+            // e-mails transacionais: evita usar a plataforma para encher a caixa de alguém ou enumerar contas
+            r = limiter.tryConsume("conta:" + ip, cfg.contaPerHour(), Duration.ofHours(1));
         } else if (post && path.startsWith("/api/auth/registro")) {
             r = limiter.tryConsume("registro:" + ip, cfg.registroPerHour(), Duration.ofHours(1));
         } else {

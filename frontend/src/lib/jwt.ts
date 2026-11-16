@@ -10,9 +10,16 @@ export interface SessionInfo {
   exp: number;
 }
 
+/** Access token (JWT curto). Cookie httpOnly, vive tanto quanto a sessão para ainda estar lá quando o JWT expira. */
 export const COOKIE = "jaguata_token";
+/** Refresh token opaco e rotativo. httpOnly, restrito a /api (só os handlers do BFF o recebem). */
+export const REFRESH_COOKIE = "jaguata_refresh";
 
-export function decodeToken(token: string | undefined): SessionInfo | null {
+/**
+ * @param ignorarExpiracao usado pela guarda de rotas: um access token vencido ainda indica o papel do usuário
+ * e o BFF o renova de forma transparente na próxima chamada.
+ */
+export function decodeToken(token: string | undefined, ignorarExpiracao = false): SessionInfo | null {
   if (!token) return null;
   try {
     const part = token.split(".")[1];
@@ -25,7 +32,7 @@ export function decodeToken(token: string | undefined): SessionInfo | null {
     );
     const p = JSON.parse(json);
     if (!p.papel || typeof p.exp !== "number") return null;
-    if (p.exp * 1000 < Date.now()) return null;
+    if (!ignorarExpiracao && p.exp * 1000 < Date.now()) return null;
     return { papel: p.papel, empresaId: p.empresaId, ongId: p.ongId, exp: p.exp };
   } catch {
     return null;

@@ -10,7 +10,11 @@ public record SecurityProperties(
         @DefaultValue("5") int loginMaxFailures,
         @DefaultValue("15") int loginLockMinutes,
         @DefaultValue("65536") int maxBodyBytes,
-        @DefaultValue("jaguata") String jwtIssuer) {
+        @DefaultValue("jaguata") String jwtIssuer,
+        /** Validade do refresh token (a sessão "lembrada"). O access token é curto (app.jwt.ttl). */
+        @DefaultValue("30") int refreshDias,
+        @DefaultValue("24") int tokenEmailHoras,
+        @DefaultValue("30") int tokenSenhaMinutos) {
 
     public record Limites(
             @DefaultValue("true") boolean enabled,
@@ -22,6 +26,8 @@ public record SecurityProperties(
             @DefaultValue("120") int apiPerMinute,
             /** Consultas de CNPJ/CEP por minuto: por usuário autenticado ou, sem token, por IP. */
             @DefaultValue("30") int consultaPerMinute,
+            /** Operações sensíveis de conta (verificar/reenviar e-mail, esqueci/redefinir senha) por hora, por IP. */
+            @DefaultValue("10") int contaPerHour,
             /**
              * Quantos proxies confiáveis existem na frente da aplicação. 0 = ignora X-Forwarded-For
              * (único valor seguro se o backend for acessível diretamente).

@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.security.rate-limit.registro-per-hour=2",
         "app.security.rate-limit.api-per-minute=5",
         "app.security.rate-limit.consulta-per-minute=3",
+        "app.security.rate-limit.conta-per-hour=3",
         "app.security.rate-limit.trusted-proxy-hops=1",
         "app.security.login-max-failures=3",
         "app.security.max-body-bytes=2048"
@@ -61,6 +62,7 @@ class SegurancaTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired JwtEncoder encoder;
+    @Autowired CapturaEmails emails;
 
     // ---------- helpers ----------
     ResultActions call(HttpMethod m, String url, String body, String token, String ip) throws Exception {
@@ -80,7 +82,7 @@ class SegurancaTest {
 
     static String empresaJson(String email, String senha) {
         return """
-                {"email":"%s","senha":"%s","cnpj":"%s"}
+                {"email":"%s","senha":"%s","cnpj":"%s","aceiteTermos":true}
                 """.formatted(email, senha, cnpj());
     }
 
@@ -88,11 +90,19 @@ class SegurancaTest {
         return "{\"email\":\"%s\",\"senha\":\"%s\"}".formatted(email, senha);
     }
 
+    /** Confirma o e-mail pelo link capturado (a verificação conta no limite "conta" do IP informado). */
+    void verificar(String email, String ip) throws Exception {
+        String token = emails.ultimoToken(email, "verificar-email");
+        call(HttpMethod.POST, "/api/auth/email/verificar", "{\"token\":\"" + token + "\"}", null, ip)
+                .andExpect(status().isNoContent());
+    }
+
     /** Registra e loga uma empresa usando IPs exclusivos (respeitando os limites baixos). */
     String tokenDeEmpresa(String ipBase) throws Exception {
         String e = email();
         call(HttpMethod.POST, "/api/auth/registro/empresa", empresaJson(e, SENHA), null, ipBase + ".1")
                 .andExpect(status().isCreated());
+        verificar(e, ipBase + ".1");
         JsonNode n = json.readTree(call(HttpMethod.POST, "/api/auth/login", loginJson(e, SENHA), null, ipBase + ".2")
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         return n.get("accessToken").asText();
@@ -167,6 +177,21 @@ class SegurancaTest {
         call(HttpMethod.GET, "/api/consulta/cep/01001000", null, null, "10.9.0.2").andExpect(status().isOk());
     }
 
+    @Test
+    void emailsTransacionaisTemLimiteProprioPorIp() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            call(HttpMethod.POST, "/api/auth/senha/esqueci", "{\"email\":\"ninguem" + i + "@teste.local\"}", null, "10.10.0.1")
+                    .andExpect(status().isAccepted());
+        }
+        call(HttpMethod.POST, "/api/auth/senha/esqueci", "{\"email\":\"ninguem@teste.local\"}", null, "10.10.0.1")
+                .andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"));
+        // o limite vale também para verificar/reenviar (mesmo balde) e é por IP
+        call(HttpMethod.POST, "/api/auth/email/reenviar", "{\"email\":\"ninguem@teste.local\"}", null, "10.10.0.1")
+                .andExpect(status().isTooManyRequests());
+        call(HttpMethod.POST, "/api/auth/email/reenviar", "{\"email\":\"ninguem@teste.local\"}", null, "10.10.0.2")
+                .andExpect(status().isAccepted());
+    }
+
     // ---------- bloqueio de conta ----------
     @Test
     void contaFicaBloqueadaAposFalhasSeguidasInclusiveComSenhaCerta() throws Exception {
@@ -186,6 +211,7 @@ class SegurancaTest {
         String e = email();
         call(HttpMethod.POST, "/api/auth/registro/empresa", empresaJson(e, SENHA), null, "10.2.1.9")
                 .andExpect(status().isCreated());
+        verificar(e, "10.2.1.9");
         for (int rodada = 0; rodada < 2; rodada++) {
             call(HttpMethod.POST, "/api/auth/login", loginJson(e, "senha-errada-xyz"), null, "10.2.1." + (rodada * 2))
                     .andExpect(status().isUnauthorized());

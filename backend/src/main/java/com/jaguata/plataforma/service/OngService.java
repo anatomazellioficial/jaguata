@@ -16,9 +16,11 @@ import java.util.UUID;
 public class OngService {
 
     private final OngRepository ongs;
+    private final com.jaguata.plataforma.conta.AuditoriaService auditoria;
 
-    public OngService(OngRepository ongs) {
+    public OngService(OngRepository ongs, com.jaguata.plataforma.conta.AuditoriaService auditoria) {
         this.ongs = ongs;
+        this.auditoria = auditoria;
     }
 
     public boolean cnpjCadastrado(String cnpj) {
@@ -67,6 +69,7 @@ public class OngService {
     private Ong alterarVerificacao(UUID id, boolean valor) {
         Ong o = ongs.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("ONG", id));
         o.setVerified(valor);
+        auditoria.registrarComoAtual(valor ? "ONG_VERIFICADA" : "ONG_VERIFICACAO_REVOGADA", "ong", id, null);
         return o;
     }
 }

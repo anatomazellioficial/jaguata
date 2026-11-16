@@ -94,11 +94,64 @@ public final class Responses {
         }
     }
 
-    public record TokenResponse(String accessToken, String tokenType, long expiresInSeconds) {
+    public record TokenResponse(String accessToken, String tokenType, long expiresInSeconds,
+                                String refreshToken, long refreshExpiresInSeconds) {
+        public static TokenResponse de(com.jaguata.plataforma.service.AuthService.Tokens t) {
+            return new TokenResponse(t.accessToken(), "Bearer", t.expiresInSeconds(), t.refreshToken(), t.refreshExpiresInSeconds());
+        }
+    }
+
+    public record PaginaResponse<T>(List<T> itens, long total, int pagina, int tamanho) {
+        public static <T> PaginaResponse<T> de(org.springframework.data.domain.Page<T> p) {
+            return new PaginaResponse<>(p.getContent(), p.getTotalElements(), p.getNumber(), p.getSize());
+        }
+    }
+
+    /** Cópia dos dados de acesso da conta (direito de acesso do titular). Nunca inclui hash de senha ou tokens. */
+    public record ContaDadosResponse(UUID id, String email, PapelUsuario papel, boolean emailVerificado,
+                                     java.time.OffsetDateTime criadaEm, String termosVersao,
+                                     java.time.OffsetDateTime termosAceitosEm, java.time.OffsetDateTime senhaAlteradaEm,
+                                     long sessoesAtivas, EmpresaResponse empresa, OngResponse ong) {
+        public static ContaDadosResponse de(Usuario u, Empresa e, Ong o, long sessoes) {
+            return new ContaDadosResponse(u.getId(), u.getEmail(), u.getPapel(), u.isEmailVerificado(), u.getCreatedAt(),
+                    u.getTermosVersao(), u.getTermosAceitosEm(), u.getSenhaAlteradaEm(), sessoes,
+                    e == null ? null : EmpresaResponse.from(e), o == null ? null : OngResponse.from(o));
+        }
+    }
+
+    /** Item da lista de candidatos da ONG (sem dados de localização exata). */
+    public record CandidatoResumoResponse(UUID id, String nomeCompleto, int idade, ModeloTrabalho modeloTrabalhoPref,
+                                          List<TagResponse> tags, java.time.OffsetDateTime cadastradoEm,
+                                          String consentimentoVersao) {
+        public static CandidatoResumoResponse from(Candidato c) {
+            return new CandidatoResumoResponse(c.getId(), c.getNomeCompleto(), c.getIdade(), c.getModeloTrabalhoPref(),
+                    c.getTags().stream().map(t -> new TagResponse(t.getCategoria(), t.getTag())).toList(),
+                    c.getCreatedAt(), c.getConsentimentoVersao());
+        }
+    }
+
+    /** Exportação completa dos dados de um candidato (LGPD, art. 18, II e V). */
+    public record CandidatoExportacaoResponse(UUID id, UUID ongId, String nomeCompleto, java.time.LocalDate dataNascimento,
+                                              String cep, double lat, double lng, ModeloTrabalho modeloTrabalhoPref,
+                                              List<TagResponse> tags, java.time.OffsetDateTime cadastradoEm,
+                                              java.time.OffsetDateTime consentimentoEm, String consentimentoVersao,
+                                              List<ParticipacaoResponse> participacoes) {
+    }
+
+    public record ParticipacaoResponse(String vaga, StatusMatch status, BigDecimal score,
+                                       java.time.OffsetDateTime desde, java.time.OffsetDateTime atualizadoEm) {
+    }
+
+    public record AuditoriaResponse(UUID id, java.time.OffsetDateTime quando, UUID usuarioId, String papel, String acao,
+                                    String entidade, UUID entidadeId, String detalhe) {
+        public static AuditoriaResponse from(Auditoria a) {
+            return new AuditoriaResponse(a.getId(), a.getQuando(), a.getUsuarioId(), a.getPapel(), a.getAcao(),
+                    a.getEntidade(), a.getEntidadeId(), a.getDetalhe());
+        }
     }
 
     /** Resultado do registro: id da empresa ou da ONG criada (o login é feito em seguida). */
-    public record RegistroResponse(UUID entidadeId, String email, PapelUsuario papel) {
+    public record RegistroResponse(UUID entidadeId, String email, PapelUsuario papel, boolean verificacaoPendente) {
     }
 
     public record CargoResponse(NivelCargo codigo, String rotulo) {

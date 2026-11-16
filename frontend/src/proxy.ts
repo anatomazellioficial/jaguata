@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE, decodeToken, homeFor, type Papel } from "@/lib/jwt";
+import { COOKIE, REFRESH_COOKIE, decodeToken, homeFor, type Papel } from "@/lib/jwt";
 
 /** Cada área só aceita o seu papel. Guarda de UX: a autorização real é feita pelo backend. */
 const AREAS: Record<string, Papel> = { "/empresa": "EMPRESA", "/ong": "ONG", "/admin": "ADMIN" };
 
 export function proxy(req: NextRequest) {
-  const info = decodeToken(req.cookies.get(COOKIE)?.value);
+  // access token vencido ainda indica o papel; o BFF o renova na primeira chamada à API.
+  // Sem nenhum dos dois cookies, não há sessão: login.
+  const info = decodeToken(req.cookies.get(COOKIE)?.value, true);
   const { pathname } = req.nextUrl;
 
   if (!info) {
@@ -21,4 +23,4 @@ export function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/empresa/:path*", "/ong/:path*", "/admin/:path*"] };
+export const config = { matcher: ["/empresa/:path*", "/ong/:path*", "/admin/:path*", "/conta/:path*"] };

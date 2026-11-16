@@ -1,47 +1,57 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND, accessValido, apagarSessao } from "@/lib/auth-server";
 import { forbidden, forwardClientIp, readBody, safeSegments, sameOrigin } from "@/lib/guard";
-import { COOKIE } from "@/lib/jwt";
 
-const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8080";
+/** Rotas de auth que NUNCA passam pelo proxy: devolvem tokens ou mexem na sessão e têm handlers próprios. */
+const BLOQUEADAS = ["auth/login", "auth/refresh", "auth/logout"];
 
 /**
- * Proxy para o backend: injeta o JWT do cookie httpOnly como Bearer.
- * - /auth/login é bloqueado aqui (usa /api/session/login) para que o token jamais
- *   seja devolvido ao JavaScript do navegador;
+ * Proxy para o backend: injeta o access token (renovado se preciso) como Bearer.
+ * - login/refresh/logout são bloqueados aqui (têm handlers em /api/session) para que token algum
+ *   volte ao JavaScript do navegador;
  * - métodos que mudam estado exigem mesma origem (anti-CSRF);
- * - caminho validado por allowlist de caracteres; corpo e query com teto de tamanho.
+ * - caminho validado por allowlist de caracteres; corpo e query com teto de tamanho;
+ * - se o backend recusar o access (401), tenta UMA renovação e repete a chamada.
  */
 async function handler(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
+  const alvo = path.join("/");
 
-  if (!safeSegments(path) || path.join("/") === "auth/login" || req.nextUrl.search.length > 512) {
+  if (!safeSegments(path) || BLOQUEADAS.includes(alvo) || req.nextUrl.search.length > 512) {
     return NextResponse.json({ detail: "Rota não permitida." }, { status: 404 });
   }
 
   const muda = !["GET", "HEAD"].includes(req.method);
   if (muda && !sameOrigin(req)) return forbidden();
 
-  const headers = new Headers();
-  const contentType = req.headers.get("content-type");
-  if (contentType) headers.set("content-type", contentType);
-  const token = (await cookies()).get(COOKIE)?.value;
-  if (token) headers.set("authorization", `Bearer ${token}`);
-  forwardClientIp(req, headers);
-
-  let body: string | undefined;
+  let corpo: string | undefined;
   if (muda) {
     const lido = await readBody(req);
     if (lido === null) return NextResponse.json({ detail: "Corpo da requisição grande demais." }, { status: 413 });
-    body = lido;
+    corpo = lido;
   }
 
-  const res = await fetch(`${BACKEND}/api/${path.join("/")}${req.nextUrl.search}`, {
-    method: req.method,
-    headers,
-    body,
-    cache: "no-store",
-  });
+  const chamar = async (token: string | undefined) => {
+    const headers = new Headers();
+    const contentType = req.headers.get("content-type");
+    if (contentType) headers.set("content-type", contentType);
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    const ua = req.headers.get("user-agent");
+    if (ua) headers.set("user-agent", ua);
+    forwardClientIp(req, headers);
+    return fetch(`${BACKEND}/api/${alvo}${req.nextUrl.search}`, {
+      method: req.method, headers, body: corpo, cache: "no-store",
+    });
+  };
+
+  // rotas públicas (consulta, cadastro, e-mail, senha) funcionam sem sessão; as demais usam o access token
+  let token = await accessValido(req.headers);
+  let res = await chamar(token);
+  if (res.status === 401 && token) {
+    token = await accessValido(req.headers, true);
+    if (token) res = await chamar(token);
+    else await apagarSessao();
+  }
 
   const out = new NextResponse(res.status === 204 ? null : res.body, { status: res.status });
   const ct = res.headers.get("content-type");

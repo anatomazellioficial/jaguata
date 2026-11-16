@@ -9,6 +9,7 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 - [Como rodar](#como-rodar)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Integrações externas (Receita e CEP)](#integrações-externas-receita-e-cep)
+- [Contas e LGPD](#contas-e-lgpd)
 - [API](#api)
 - [Testes](#testes)
 - [Segurança](#segurança)
@@ -61,6 +62,7 @@ docker compose up --build
 ```
 
 - Frontend: <http://localhost:3000>
+- **E-mails de desenvolvimento** (verificação de conta, senha): <http://localhost:8025> (Mailpit; se a porta estiver ocupada, defina `MAILPIT_PORT`). Em produção, remova o serviço `mailpit` e configure um SMTP real.
 - API e banco ficam acessíveis **somente em `127.0.0.1`** (backend `8080`, banco `5432`).
 - Se alguma porta já estiver em uso, defina `FRONTEND_PORT`, `BACKEND_PORT` ou `DB_PORT`.
 - O primeiro usuário `ADMIN` é criado a partir de `ADMIN_EMAIL` / `ADMIN_PASSWORD` **se ainda não existir** (o bootstrap não altera a senha de uma conta existente).
@@ -89,7 +91,14 @@ BACKEND_URL=http://localhost:8080 npm run dev
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `JWT_SECRET` | — (**obrigatória**) | Segredo HS256, mínimo de 32 bytes. Sem valor padrão de propósito. |
-| `JWT_TTL` | `PT1H` | Validade do token. |
+| `JWT_TTL` | `PT15M` | Validade do access token (curto). A sessão longa é o refresh token. |
+| `REFRESH_DIAS` | `30` | Validade do refresh token (sessão "lembrada"). |
+| `TOKEN_EMAIL_HORAS` / `TOKEN_SENHA_MINUTOS` | `24` / `30` | Validade dos links de verificação de e-mail e de redefinição de senha. |
+| `SPRING_MAIL_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_AUTH` / `_STARTTLS` | — | SMTP para os e-mails transacionais. |
+| `MAIL_FROM` | `Jaguatá <nao-responda@jaguata.local>` | Remetente. |
+| `MAIL_MODO` | `smtp` | `log` escreve os e-mails (com links) no log: **só desenvolvimento**. |
+| `APP_BASE_URL` | `http://localhost:3000` | Endereço público do frontend, usado nos links dos e-mails. |
+| `RATE_LIMIT_CONTA_PER_HOUR` | `10` | Operações de e-mail transacional por hora, por IP. |
 | `JWT_ISSUER` | `jaguata` | Emissor exigido na validação do token. |
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | `…/jaguata` | Conexão com o banco. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | vazio | Cria o primeiro admin (senha com 10+ caracteres). |
@@ -134,6 +143,28 @@ O cadastro **não aceita** razão social, CNAE, porte, endereço nem coordenadas
 
 **Privacidade (LGPD):** para as fontes externas só trafegam **CNPJ, CEP e nomes de rua/cidade** (dados públicos). Nenhum nome, e-mail ou dado de candidato é enviado. A resposta da Receita inclui o quadro societário (nomes de pessoas físicas): ele **nunca é lido, guardado nem exposto**. As rotas `/api/consulta/**` são públicas (o cadastro ainda não tem conta), por isso têm rate limit próprio e só devolvem dados públicos.
 
+## Contas e LGPD
+
+### Contas e sessões
+- **Verificação de e-mail**: o cadastro envia um link (24 h, uso único). Sem confirmar, o login responde `403` com `codigo: EMAIL_NAO_VERIFICADO` — só depois de a senha estar correta, para o login não revelar quais e-mails existem. Há reenvio (no máximo 1 por minuto por conta).
+- **Recuperação de senha**: `esqueci` responde sempre `202`, exista ou não o e-mail. O link (30 min, uso único) só é gasto quando a nova senha passa na política. Toda troca de senha **encerra todas as sessões** e envia um aviso de segurança por e-mail.
+- **Sessões**: access token JWT de **15 min** + **refresh token opaco e rotativo** (30 dias). Cada renovação revoga o token anterior; **reapresentar um token já usado revoga a sessão inteira** (indício de roubo). Logout revoga no servidor. Só o hash dos tokens vai para o banco.
+- **BFF**: o navegador só tem cookies `httpOnly` (access em `/`, refresh restrito a `/api`). O BFF renova o access sozinho; renovações paralelas compartilham uma única chamada e há uma janela de 30 s para requisições atrasadas, para a rotação não ser confundida com ataque.
+- **Conta**: troca de senha, "sair de todos os dispositivos", cópia dos dados e exclusão do acesso (com senha) em `/conta`.
+- Tokens e sessões expirados são limpos diariamente.
+
+### LGPD
+| Tema | Como está implementado |
+|---|---|
+| **Termos e Privacidade** | Páginas `/termos` e `/privacidade` (texto-modelo **para revisão jurídica**, com lacunas entre [colchetes]). O aceite é obrigatório no cadastro e grava versão e data. |
+| **Consentimento do candidato** | A ONG atesta, no cadastro, que o(a) assistido(a) assinou o termo (texto em `/termos#consentimento`). Ficam registrados versão, data e **qual usuário** atestou. |
+| **Acesso e portabilidade** | ONG: `GET /api/ongs/{id}/candidatos/{cid}/dados` (todos os dados + participações). Usuário: `GET /api/conta/dados` (sem hashes). |
+| **Eliminação** | ONG: `DELETE …/candidatos/{cid}` **anonimiza** (nome, nascimento, CEP, coordenadas e tags) e encerra pendências; contratações concluídas permanecem sem identificar a pessoa. Usuário: `DELETE /api/conta`. |
+| **Minimização** | A lista da ONG não traz CEP nem coordenadas; a ONG só vê o título (já traduzido) da vaga; a empresa só vê nome, score e andamento. |
+| **Auditoria** | Cadastro, login, troca de senha, exportação, anonimização, verificação de ONG e mudanças do funil ficam em `auditoria` (admin: `GET /api/admin/auditoria`). **Nunca** guarda nomes nem e-mails. |
+
+Rotas novas: `POST /api/auth/{refresh,logout}`, `/api/auth/email/{verificar,reenviar}`, `/api/auth/senha/{esqueci,redefinir}`, `/api/conta/{dados,senha,sessoes/encerrar}` e `DELETE /api/conta`.
+
 ## API
 
 Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erros seguem RFC 7807 (`application/problem+json`).
@@ -152,7 +183,10 @@ Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erro
 | `POST /api/ongs/{id}/candidatos` | ONG dona | Cadastra candidato (18+) com tags (informa o **CEP**) |
 | `GET /api/ongs/{id}/matches?status=` | ONG dona | Fila/funil da ONG |
 | `PATCH /api/matches/{id}/status` | ONG ou empresa (conforme a etapa) | Avança o funil |
-| `GET /api/admin/ongs` · `/resumo` · `POST /api/admin/ongs/{id}/verificar` · `/revogar` | admin | Verificação de ONGs e indicadores |
+| `GET /api/admin/ongs` · `/resumo` · `/auditoria` · `POST /api/admin/ongs/{id}/verificar` · `/revogar` | admin | Verificação de ONGs, indicadores e trilha de auditoria |
+| `GET /api/ongs/{id}/candidatos` · `…/{cid}/dados` · `DELETE …/{cid}` | ONG dona | Lista paginada, exportação e anonimização (LGPD) |
+| `/api/auth/refresh` · `/logout` · `/email/*` · `/senha/*` | público | Sessão, verificação de e-mail e recuperação de senha |
+| `/api/conta/*` | autenticado | Troca de senha, sessões, dados e exclusão da conta |
 
 Contratar é terminal: fecha a vaga (reabra com `PATCH /api/vagas/{id}/status` se precisar de outra contratação; pendências já encerradas não voltam).
 
@@ -167,7 +201,7 @@ cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS re
 cd frontend && npm run typecheck
 ```
 
-A suíte do backend (80 testes) cobre: regras de negócio, migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+A suíte do backend (105 testes) cobre: regras de negócio, migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
 
 ## Segurança
 
@@ -222,8 +256,12 @@ docker-compose.yml
 
 - **Dependência de serviços públicos**: BrasilAPI e Nominatim não têm SLA; se ficarem fora do ar, o cadastro e a criação de vagas/candidatos retornam `503`. O porte reflete o que a Receita publica (declaração cadastral), não um cálculo de faturamento feito pela plataforma.
 - **Precisão geográfica**: coordenadas por CEP são o ponto do CEP (ou aproximações por rua/cidade) — adequadas para raios em km, não para endereços exatos.
-- **Sessão**: não há *refresh token* nem revogação/logout no servidor; o token vale até expirar (1 h por padrão). Troca de senha e "sair de todos os dispositivos" dependem disso.
-- **Recuperação de senha e verificação de e-mail** ainda não existem.
+- **Textos legais**: Termos e Privacidade são modelos técnicos; precisam de revisão jurídica e de definição de controlador, encarregado (DPO), foro e prazos de retenção (inclusive da auditoria).
+- **Autenticação em dois fatores** (TOTP) para administradores ainda não existe.
+- **Notificações de match** por e-mail (nova sugestão, candidato enviado, convocação) ainda não existem; a infraestrutura de e-mail já está pronta.
+- **Access token**: após logout ou troca de senha, um access token já emitido continua válido até expirar (até 15 min); o refresh token é revogado na hora.
+- **Cache de renovação do BFF** é por processo: com várias instâncias do frontend, use afinidade de sessão.
+- Novo aceite quando os Termos mudarem de versão ainda não é exigido (a versão aceita fica registrada).
 - **Rate limit em memória**: não é compartilhado entre réplicas.
 - **Bloqueio de conta** permite que terceiros travem temporariamente uma conta alheia (contrapartida conhecida dessa defesa).
 - **CSP do frontend** usa `'unsafe-inline'` por causa da hidratação do Next; o próximo passo é CSP com *nonce*.

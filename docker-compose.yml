@@ -19,12 +19,33 @@ services:
       timeout: 3s
       retries: 10
 
+  # Caixa de e-mail de DESENVOLVIMENTO: captura tudo que o backend envia (verificação, senha) sem sair da máquina.
+  # Veja os e-mails em http://localhost:8025. Em produção, remova este serviço e configure um SMTP real
+  # (SPRING_MAIL_HOST/PORT/USERNAME/PASSWORD, MAIL_FROM) e APP_BASE_URL com o endereço público.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+    security_opt:
+      - no-new-privileges:true
+
   backend:
     build: ./backend
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
+      # E-mail transacional (verificação de conta, recuperação de senha, avisos de segurança)
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_AUTH: ${SPRING_MAIL_AUTH:-false}
+      SPRING_MAIL_STARTTLS: ${SPRING_MAIL_STARTTLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-Jaguatá <nao-responda@jaguata.local>}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}   # base dos links nos e-mails (endereço público do frontend)
       DB_URL: jdbc:postgresql://db:5432/jaguata
       DB_USER: jaguata
       DB_PASSWORD: ${DB_PASSWORD:-jaguata}

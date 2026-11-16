@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useMotionValueEvent, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { logout } from "@/lib/api";
 import { Logo } from "./Logo";
@@ -32,6 +33,7 @@ export function Shell({ title, subtitle, action, children }: {
         </motion.span>
         <div className="flex items-center gap-2">
           {action}
+          <Link href="/conta" className="rounded-full px-3 py-1.5 text-[13px] font-semibold text-mute transition-colors hover:bg-navy/[.06] hover:text-navy">Conta</Link>
           <Button variant="ghost" size="sm" onClick={() => logout()}>Sair</Button>
         </div>
       </motion.header>
@@ -66,10 +68,15 @@ export function AuthFrame({ title, subtitle, children, footer }: {
         {!subtitle && <div className="mb-7" />}
         {children}
       </motion.div>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-        className="mt-6 text-center text-sm text-mute">
-        {footer}
-      </motion.p>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+        className="mt-6 space-y-3 text-center text-sm text-mute">
+        <p>{footer}</p>
+        <p className="text-xs">
+          <Link href="/termos" className="hover:text-navy hover:underline">Termos de Uso</Link>
+          {" · "}
+          <Link href="/privacidade" className="hover:text-navy hover:underline">Privacidade</Link>
+        </p>
+      </motion.div>
     </main>
   );
 }

@@ -22,14 +22,38 @@ public final class Requests {
     public record RegistroEmpresaRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
-            @NotBlank @Size(max = 18) String cnpj) {
+            @NotBlank @Size(max = 18) String cnpj,
+            @AssertTrue(message = "É necessário aceitar os Termos de Uso e a Política de Privacidade.") boolean aceiteTermos) {
     }
 
     public record RegistroOngRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String senha,
             @NotBlank @Size(max = 18) String cnpj,
-            @NotNull NivelCapacidade nivelCapacidade) {
+            @NotNull NivelCapacidade nivelCapacidade,
+            @AssertTrue(message = "É necessário aceitar os Termos de Uso e a Política de Privacidade.") boolean aceiteTermos) {
+    }
+
+    public record RefreshRequest(@NotBlank @Size(max = 128) String refreshToken) {
+    }
+
+    public record TokenRequest(@NotBlank @Size(max = 128) String token) {
+    }
+
+    public record EmailRequest(@NotBlank @Email @Size(max = 254) String email) {
+    }
+
+    public record RedefinirSenhaRequest(
+            @NotBlank @Size(max = 128) String token,
+            @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String novaSenha) {
+    }
+
+    public record AlterarSenhaRequest(
+            @NotBlank @Size(max = 72) String senhaAtual,
+            @NotBlank @Size(min = 10, max = 72, message = "Senha deve ter de 10 a 72 caracteres") String novaSenha) {
+    }
+
+    public record ExcluirContaRequest(@NotBlank @Size(max = 72) String senha) {
     }
 
     public record TagRequest(@NotNull CategoriaTag categoria, @NotBlank @Size(max = 80) String tag) {
@@ -40,7 +64,9 @@ public final class Requests {
             @NotNull @Past LocalDate dataNascimento,
             @NotBlank @Size(max = 9) String cep,
             @NotNull ModeloTrabalho modeloTrabalhoPref,
-            @Valid List<TagRequest> tags) {
+            @Valid List<TagRequest> tags,
+            /** A ONG atesta que o(a) assistido(a) assinou o termo de consentimento para o tratamento dos dados. */
+            @AssertTrue(message = "É necessário confirmar o consentimento do(a) assistido(a).") boolean consentimentoConfirmado) {
     }
 
     public record VagaRequest(

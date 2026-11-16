@@ -259,4 +259,19 @@ class IntegracaoPostgisTest {
         // recusar continua permitido
         assertEquals(StatusMatch.RECUSADO, matchService.avancar(m.getId(), StatusMatch.RECUSADO).getStatus());
     }
+
+    @Test
+    void bancoImpedeDuplaContratacaoDoMesmoCandidatoMesmoForaDoServico() {
+        candidato("Ana", 30, PAULISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v1 = vaga(NivelCargo.ANALISTA, ModeloTrabalho.PRESENCIAL);
+        Vaga v2 = vaga(NivelCargo.ASSISTENTE, ModeloTrabalho.PRESENCIAL);
+        Match m1 = matchService.gerarSugestoes(v1.getId(), 10, 50).get(0);
+        Match m2 = matchService.gerarSugestoes(v2.getId(), 10, 50).get(0);
+        em.flush();
+
+        // o índice único parcial vale mesmo para quem escreve direto no banco (uma corrida, um bug)
+        jdbc.update("update matches set status = 'CONTRATADO' where id = ?", m1.getId());
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbc.update("update matches set status = 'CONTRATADO' where id = ?", m2.getId()));
+    }
 }

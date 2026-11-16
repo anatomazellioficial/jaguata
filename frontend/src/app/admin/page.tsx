@@ -3,9 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { Avatar, Button, Card, Notice, Segmented, Skeleton, Stat, spring } from "@/components/ui";
+import { Avatar, Button, Card, Notice, Segmented, Select, Skeleton, Stat, spring } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
-import { ROTULO_STATUS, type AdminOng, type Resumo, type StatusMatch } from "@/lib/types";
+import { ROTULO_STATUS, type AdminOng, type Auditoria, type Pagina, type Resumo, type StatusMatch } from "@/lib/types";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 type Filtro = "pendentes" | "verificadas" | "todas";
@@ -128,6 +128,71 @@ export default function AdminPage() {
           </AnimatePresence>
         </ul>
       </section>
+
+      <AuditoriaSecao />
     </Shell>
+  );
+}
+
+const ACOES = [
+  "REGISTRO", "EMAIL_VERIFICADO", "LOGIN", "SENHA_ALTERADA", "SENHA_REDEFINIDA", "SESSOES_ENCERRADAS", "CONTA_EXCLUIDA",
+  "CANDIDATO_CADASTRADO", "CANDIDATO_EXPORTADO", "CANDIDATO_ANONIMIZADO",
+  "ONG_VERIFICADA", "ONG_VERIFICACAO_REVOGADA", "MATCH_ENVIADO", "MATCH_ENTREVISTA", "MATCH_CONTRATADO", "MATCH_RECUSADO",
+];
+
+const fmtQuando = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" });
+
+/** Trilha de auditoria: quem fez o quê e quando (o detalhe nunca contém dados pessoais). */
+function AuditoriaSecao() {
+  const [acao, setAcao] = useState("");
+  const [pagina, setPagina] = useState(0);
+  const [dados, setDados] = useState<Pagina<Auditoria>>();
+  const [erro, setErro] = useState<string>();
+  const TAM = 15;
+
+  useEffect(() => {
+    setDados(undefined);
+    api<Pagina<Auditoria>>(`admin/auditoria?pagina=${pagina}&tamanho=${TAM}${acao ? `&acao=${acao}` : ""}`)
+      .then(setDados)
+      .catch((e) => setErro(msg(e)));
+  }, [acao, pagina]);
+
+  const paginas = dados ? Math.max(1, Math.ceil(dados.total / TAM)) : 1;
+
+  return (
+    <section className="mt-14">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <h2 className="title text-3xl">Auditoria</h2>
+        <div className="w-64">
+          <Select label="Filtrar por ação" value={acao} onChange={(e) => { setAcao(e.target.value); setPagina(0); }}>
+            <option value="">Todas as ações</option>
+            {ACOES.map((a) => <option key={a} value={a}>{a}</option>)}
+          </Select>
+        </div>
+      </div>
+      {erro && <div className="mb-4"><Notice>{erro}</Notice></div>}
+      {!dados && !erro && <Skeleton className="h-48" />}
+      {dados && dados.itens.length === 0 && <Card className="px-6 py-10 text-center"><p className="text-mute">Nenhum registro.</p></Card>}
+      {dados && dados.itens.length > 0 && (
+        <ul className="divide-y divide-navy/5 overflow-hidden rounded-[26px] bg-white/70 shadow-soft">
+          {dados.itens.map((a) => (
+            <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 text-sm">
+              <span className="rounded-full bg-navy/[.06] px-3 py-1 text-xs font-bold">{a.acao}</span>
+              <span className="text-mute">{a.papel ?? "sistema"}</span>
+              {a.entidade && <span className="font-mono text-xs text-mute">{a.entidade} {a.entidadeId?.slice(0, 8)}</span>}
+              {a.detalhe && <span className="text-mute">· {a.detalhe}</span>}
+              <span className="ml-auto text-xs tabular-nums text-mute">{fmtQuando(a.quando)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {dados && paginas > 1 && (
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>← Anterior</Button>
+          <span className="text-sm text-mute">Página {pagina + 1} de {paginas}</span>
+          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima →</Button>
+        </div>
+      )}
+    </section>
   );
 }

@@ -7,6 +7,19 @@ spring:
     hibernate:
       ddl-auto: validate   # o schema é gerenciado exclusivamente pelo Flyway
     open-in-view: false
+    properties:
+      hibernate.default_batch_fetch_size: 50   # evita N+1 ao listar candidatos com tags
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_AUTH:false}
+      mail.smtp.starttls.enable: ${SPRING_MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 8000
+      mail.smtp.writetimeout: 8000
   flyway:
     enabled: true
 
@@ -24,7 +37,7 @@ app:
   jwt:
     # OBRIGATÓRIO: segredo HS256 com no mínimo 32 bytes (ex.: openssl rand -base64 48). Sem default de propósito.
     secret: ${JWT_SECRET:}
-    ttl: ${JWT_TTL:PT1H}
+    ttl: ${JWT_TTL:PT15M}   # access token curto; a sessão longa é o refresh token rotativo (security.refresh-dias)
   admin:
     # Opcional: cria o primeiro ADMIN no startup se ainda não existir (senha com no mínimo 10 caracteres).
     email: ${ADMIN_EMAIL:}
@@ -40,7 +53,14 @@ app:
     nominatim-min-interval-ms: 1100
     cnpj-cache-hours: ${CNPJ_CACHE_HOURS:24}
     cep-cache-days: ${CEP_CACHE_DAYS:30}
+  base-url: ${APP_BASE_URL:http://localhost:3000}     # base dos links enviados por e-mail
+  mail:
+    modo: ${MAIL_MODO:smtp}                              # smtp (padrão) | log (só desenvolvimento)
+    from: ${MAIL_FROM:Jaguatá <nao-responda@jaguata.local>}
   security:
+    refresh-dias: ${REFRESH_DIAS:30}
+    token-email-horas: ${TOKEN_EMAIL_HORAS:24}
+    token-senha-minutos: ${TOKEN_SENHA_MINUTOS:30}
     jwt-issuer: ${JWT_ISSUER:jaguata}
     login-max-failures: ${LOGIN_MAX_FAILURES:5}      # falhas seguidas até bloquear a conta
     login-lock-minutes: ${LOGIN_LOCK_MINUTES:15}     # duração do bloqueio
@@ -51,5 +71,6 @@ app:
       registro-per-hour: ${RATE_LIMIT_REGISTRO_PER_HOUR:5}     # por IP
       api-per-minute: ${RATE_LIMIT_API_PER_MINUTE:120}         # por usuário (ou IP sem token)
       consulta-per-minute: ${RATE_LIMIT_CONSULTA_PER_MINUTE:30} # consultas de CNPJ/CEP
+      conta-per-hour: ${RATE_LIMIT_CONTA_PER_HOUR:10}           # e-mails transacionais (verificar/esqueci senha), por IP
       # Nº de proxies CONFIÁVEIS na frente do backend. 0 = ignora X-Forwarded-For (seguro por padrão).
       trusted-proxy-hops: ${RATE_LIMIT_TRUSTED_PROXY_HOPS:0}

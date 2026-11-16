@@ -65,6 +65,24 @@ public class Candidato {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    /** Consentimento do(a) assistido(a), atestado pela ONG no cadastro. */
+    @Column(name = "consentimento_em")
+    private OffsetDateTime consentimentoEm;
+
+    @Column(name = "consentimento_versao", length = 20)
+    private String consentimentoVersao;
+
+    @Column(name = "consentimento_usuario_id")
+    private UUID consentimentoUsuarioId;
+
+    /** Preenchido quando os dados pessoais foram anonimizados a pedido do titular. */
+    @Column(name = "anonimizado_em")
+    private OffsetDateTime anonimizadoEm;
+
+    public boolean isAnonimizado() {
+        return anonimizadoEm != null;
+    }
+
     @OneToMany(mappedBy = "candidato", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CandidatoTag> tags = new LinkedHashSet<>();
 
