@@ -2,8 +2,10 @@ package com.jaguata.plataforma.controller;
 
 import com.jaguata.plataforma.domain.enums.StatusMatch;
 import com.jaguata.plataforma.domain.enums.SetorAtuacao;
+import com.jaguata.plataforma.dto.Requests.CandidatoEdicaoRequest;
 import com.jaguata.plataforma.dto.Requests.CandidatoRequest;
 import com.jaguata.plataforma.dto.Requests.SetoresRequest;
+import com.jaguata.plataforma.dto.Responses.CandidatoEdicaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoExportacaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResumoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResponse;
@@ -63,6 +65,24 @@ public class OngController {
                 req.nomeCompleto(), req.dataNascimento(), loc.cep(), loc.lat(), loc.lng(),
                 req.modeloTrabalhoPref(), tags, req.escolaridade(), req.genero(), req.racaCor(), req.regimes()),
                 UUID.fromString(jwt.getSubject())));
+    }
+
+    @GetMapping("/{id}/candidatos/{candidatoId}")
+    @PreAuthorize("@acesso.ong(#id)")
+    public CandidatoEdicaoResponse candidato(@PathVariable UUID id, @PathVariable UUID candidatoId) {
+        return candidatos.paraEdicao(id, candidatoId);
+    }
+
+    @PutMapping("/{id}/candidatos/{candidatoId}")
+    @PreAuthorize("@acesso.ong(#id)")
+    public CandidatoResponse editarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId,
+                                             @Valid @RequestBody CandidatoEdicaoRequest req) {
+        List<TagInput> tags = req.tags() == null ? List.of()
+                : req.tags().stream().map(t -> new TagInput(t.categoria(), t.tag())).toList();
+        Localizacao loc = consulta.cep(req.cep());
+        return CandidatoResponse.from(candidatos.atualizar(id, candidatoId, new CadastrarCandidatoCommand(
+                req.nomeCompleto(), req.dataNascimento(), loc.cep(), loc.lat(), loc.lng(),
+                req.modeloTrabalhoPref(), tags, req.escolaridade(), req.genero(), req.racaCor(), req.regimes())));
     }
 
     /** Candidatos ativos da ONG (os anonimizados não aparecem). */

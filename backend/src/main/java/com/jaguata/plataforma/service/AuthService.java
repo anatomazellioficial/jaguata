@@ -3,6 +3,7 @@ package com.jaguata.plataforma.service;
 import com.jaguata.plataforma.conta.AuditoriaService;
 import com.jaguata.plataforma.conta.SessaoService;
 import com.jaguata.plataforma.conta.Termos;
+import com.jaguata.plataforma.conta.TotpService;
 import com.jaguata.plataforma.domain.Empresa;
 import com.jaguata.plataforma.domain.Ong;
 import com.jaguata.plataforma.domain.Usuario;
@@ -15,6 +16,7 @@ import com.jaguata.plataforma.exception.EntradaInvalidaException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
 import com.jaguata.plataforma.exception.SessaoInvalidaException;
 import com.jaguata.plataforma.exception.TentativasExcedidasException;
+import com.jaguata.plataforma.exception.TotpRequeridoException;
 import com.jaguata.plataforma.integracao.ConsultaService;
 import com.jaguata.plataforma.integracao.DadosCnpj;
 import com.jaguata.plataforma.integracao.Documentos;
@@ -52,11 +54,12 @@ public class AuthService {
     private final SessaoService sessoes;
     private final JwtService jwt;
     private final AuditoriaService auditoria;
+    private final TotpService totp;
 
     public AuthService(UsuarioRepository usuarios, EmpresaService empresas, OngService ongs,
                        PasswordEncoder encoder, LoginAttemptService tentativas, ConsultaService consulta,
                        TransactionTemplate tx, ContaService contas, SessaoService sessoes, JwtService jwt,
-                       AuditoriaService auditoria) {
+                       AuditoriaService auditoria, TotpService totp) {
         this.usuarios = usuarios;
         this.empresas = empresas;
         this.ongs = ongs;
@@ -68,6 +71,7 @@ public class AuthService {
         this.sessoes = sessoes;
         this.jwt = jwt;
         this.auditoria = auditoria;
+        this.totp = totp;
         this.hashFalso = encoder.encode("senha-inexistente");
     }
 
@@ -162,8 +166,14 @@ public class AuthService {
      * Valida as credenciais. A verificação de e-mail só é cobrada DEPOIS da senha correta, para que o
      * login não sirva para descobrir quais e-mails existem.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Usuario autenticar(String email, String senha) {
+        return autenticar(email, senha, null);
+    }
+
+    /** Com segundo fator ativo, o código errado conta como falha de login (bloqueio da conta); a ausência dele, não. */
+    @Transactional
+    public Usuario autenticar(String email, String senha, String codigoTotp) {
         String e = normalizar(email);
         if (tentativas.bloqueado(e)) {
             throw new TentativasExcedidasException(tentativas.segundosRestantes());
@@ -175,6 +185,13 @@ public class AuthService {
             tentativas.registrarFalha(e);
             throw new CredenciaisInvalidasException();
         }
+        if (u.isTotpAtivo()) {
+            if (codigoTotp == null || codigoTotp.isBlank()) throw new TotpRequeridoException();
+            if (!totp.confirmar(u, codigoTotp)) {
+                tentativas.registrarFalha(e);
+                throw new CredenciaisInvalidasException();
+            }
+        }
         tentativas.limpar(e);
         if (!u.isEmailVerificado()) throw new EmailNaoVerificadoException();
         return u;
@@ -182,9 +199,9 @@ public class AuthService {
 
     /** Emite o par access/refresh para um usuário já autenticado. */
     public Tokens iniciarSessao(Usuario u, String userAgent) {
-        String refresh = sessoes.abrir(u.getId(), userAgent);
+        SessaoService.Aberta s = sessoes.abrir(u.getId(), userAgent);
         auditoria.registrar(u.getId(), u.getPapel().name(), "LOGIN", "usuario", u.getId(), null);
-        return montar(u, refresh);
+        return montar(u, s.refreshToken(), s.sessaoId());
     }
 
     /** Troca o refresh token por um par novo (rotação). Reuso de token antigo revoga a família inteira. */
@@ -195,15 +212,15 @@ public class AuthService {
             sessoes.encerrar(r.novoRefreshToken());
             throw new SessaoInvalidaException();
         }
-        return montar(u, r.novoRefreshToken());
+        return montar(u, r.novoRefreshToken(), r.sessaoId());
     }
 
     public void sair(String refreshToken) {
         sessoes.encerrar(refreshToken);
     }
 
-    private Tokens montar(Usuario u, String refresh) {
-        return new Tokens(jwt.emitir(u), jwt.getTtl().toSeconds(), refresh, sessoes.getValidade().toSeconds());
+    private Tokens montar(Usuario u, String refresh, java.util.UUID sessaoId) {
+        return new Tokens(jwt.emitir(u, sessaoId), jwt.getTtl().toSeconds(), refresh, sessoes.getValidade().toSeconds());
     }
 
     // ------------------------------------------------------------------ utilitários

@@ -23,9 +23,16 @@ export interface Vaga {
 }
 /** Um critério do score: quanto valeu, de quanto, e uma nota curta (nunca revela atributos sensíveis). */
 export interface Motivo { criterio: string; pontos: number; maximo: number; nota: string | null }
+export interface CandidatoEdicao {
+  id: string; nomeCompleto: string; dataNascimento: string; cep: string; modeloTrabalhoPref: ModeloTrabalho;
+  escolaridade: string | null; genero: string | null; racaCor: string | null; regimes: string[];
+  tags: { categoria: CategoriaTag; tag: string }[];
+}
 export interface Match {
   id: string; vagaId: string; tituloVaga: string; candidatoId: string; candidatoNome: string;
-  ongId: string; matchScore: number; status: StatusMatch; motivos: Motivo[];
+  ongId: string; status: StatusMatch; motivos: Motivo[];
+  /** Só a ONG recebe a nota; a empresa vê apenas a posição no ranking (evita inferir grupos de vagas afirmativas). */
+  matchScore?: number; posicao?: number | null;
 }
 export interface AdminOng {
   id: string; cnpj: string; razaoSocial: string; cnaePrincipal: string;
@@ -69,6 +76,7 @@ export interface CandidatoResumo {
 export interface ContaDados {
   id: string; email: string; papel: "EMPRESA" | "ONG" | "ADMIN"; emailVerificado: boolean; criadaEm: string;
   termosVersao: string | null; termosAceitosEm: string | null; senhaAlteradaEm: string | null; sessoesAtivas: number;
+  notificacoesEmail: boolean; termosPendentes: boolean;
   empresa: Empresa | null; ong: { id: string; cnpj: string; razaoSocial: string; verified: boolean } | null;
 }
 export interface Auditoria {

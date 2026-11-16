@@ -15,3 +15,15 @@ export function useCatalogo() {
   }, []);
   return c;
 }
+
+let cacheSkills: string[] | undefined;
+
+/** Habilidades sugeridas (catálogo do servidor); o texto livre continua permitido. */
+export function useSkills() {
+  const [c, setC] = useState<string[] | undefined>(cacheSkills);
+  useEffect(() => {
+    if (cacheSkills) return;
+    api<string[]>("cardapio/skills").then((r) => { cacheSkills = r; setC(r); }).catch(() => undefined);
+  }, []);
+  return c ?? [];
+}

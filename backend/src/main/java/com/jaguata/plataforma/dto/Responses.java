@@ -41,6 +41,22 @@ public final class Responses {
     }
 
     /** Visão da EMPRESA: mostra o cargo escolhido e o título que a ONG enxergará. */
+    /**
+     * Visão da EMPRESA sobre um match: só a posição no ranking, sem nota numérica e sem o critério de prioridade.
+     * Assim a empresa não consegue deduzir, pela diferença de pontos, quem pertence a um grupo de vaga afirmativa.
+     */
+    public record MatchEmpresaResponse(UUID id, UUID vagaId, String tituloVaga, UUID candidatoId,
+                                       String candidatoNome, UUID ongId, Integer posicao, StatusMatch status,
+                                       List<com.jaguata.plataforma.service.Motivo> motivos) {
+        public static MatchEmpresaResponse from(Match m, Integer posicao) {
+            List<com.jaguata.plataforma.service.Motivo> visiveis = MatchResponse.motivos(m.getScoreDetalhe()).stream()
+                    .filter(x -> !"PRIORIDADE".equals(x.criterio())).toList();
+            return new MatchEmpresaResponse(m.getId(), m.getVaga().getId(), m.getVaga().getTituloExibicao(),
+                    m.getCandidato().getId(), m.getCandidato().getNomeCompleto(), m.getOng().getId(), posicao,
+                    m.getStatus(), visiveis);
+        }
+    }
+
     public record VagaResponse(UUID id, UUID empresaId, NivelCargo nivelCargo, String tituloExibicao,
                                TipoContrato tipoContrato, ModeloTrabalho modeloTrabalho,
                                String cepAtuacao, StatusVaga status,
@@ -128,11 +144,25 @@ public final class Responses {
     public record ContaDadosResponse(UUID id, String email, PapelUsuario papel, boolean emailVerificado,
                                      java.time.OffsetDateTime criadaEm, String termosVersao,
                                      java.time.OffsetDateTime termosAceitosEm, java.time.OffsetDateTime senhaAlteradaEm,
-                                     long sessoesAtivas, EmpresaResponse empresa, OngResponse ong) {
+                                     long sessoesAtivas, EmpresaResponse empresa, OngResponse ong,
+                                     boolean notificacoesEmail, boolean termosPendentes) {
         public static ContaDadosResponse de(Usuario u, Empresa e, Ong o, long sessoes) {
             return new ContaDadosResponse(u.getId(), u.getEmail(), u.getPapel(), u.isEmailVerificado(), u.getCreatedAt(),
                     u.getTermosVersao(), u.getTermosAceitosEm(), u.getSenhaAlteradaEm(), sessoes,
-                    e == null ? null : EmpresaResponse.from(e), o == null ? null : OngResponse.from(o));
+                    e == null ? null : EmpresaResponse.from(e), o == null ? null : OngResponse.from(o),
+                    u.isNotificacoesEmail(), !com.jaguata.plataforma.conta.Termos.VERSAO.equals(u.getTermosVersao()));
+        }
+    }
+
+    /** Cadastro completo, só para a ONG dona (preenche o formulário de edição). Nunca vai para empresas. */
+    public record CandidatoEdicaoResponse(UUID id, String nomeCompleto, java.time.LocalDate dataNascimento, String cep,
+                                          ModeloTrabalho modeloTrabalhoPref, Escolaridade escolaridade, Genero genero,
+                                          RacaCor racaCor, List<RegimeContratacao> regimes, List<TagResponse> tags) {
+        public static CandidatoEdicaoResponse from(Candidato c) {
+            return new CandidatoEdicaoResponse(c.getId(), c.getNomeCompleto(), c.getDataNascimento(), c.getCep(),
+                    c.getModeloTrabalhoPref(), c.getEscolaridade(), c.getGenero(), c.getRacaCor(),
+                    List.copyOf(c.getRegimes()),
+                    c.getTags().stream().map(t -> new TagResponse(t.getCategoria(), t.getTag())).toList());
         }
     }
 

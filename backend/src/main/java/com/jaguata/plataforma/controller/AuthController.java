@@ -46,7 +46,7 @@ public class AuthController {
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest req,
                                @RequestHeader(value = "User-Agent", required = false) String userAgent) {
-        Usuario u = auth.autenticar(req.email(), req.senha());
+        Usuario u = auth.autenticar(req.email(), req.senha(), req.codigoTotp());
         return TokenResponse.de(auth.iniciarSessao(u, userAgent));
     }
 

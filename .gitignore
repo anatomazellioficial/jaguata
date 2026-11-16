@@ -21,3 +21,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+
+# testes
+e2e/resultados/
+e2e/telas/
+test-results/
+playwright-report/

@@ -16,7 +16,16 @@ public final class Requests {
     private Requests() {
     }
 
-    public record LoginRequest(@NotBlank @Email String email, @NotBlank String senha) {
+    /** {@code codigoTotp}: obrigatório só para contas com segundo fator ativo. */
+    public record LoginRequest(@NotBlank @Email String email, @NotBlank String senha,
+                               @Pattern(regexp = "\\d{6}", message = "O código tem 6 dígitos.") String codigoTotp) {
+    }
+
+    public record CodigoTotpRequest(@NotBlank @Pattern(regexp = "\\d{6}", message = "O código tem 6 dígitos.") String codigo) {
+    }
+
+    public record DesativarTotpRequest(@NotBlank @Size(max = 72) String senha,
+                                       @NotBlank @Pattern(regexp = "\\d{6}", message = "O código tem 6 dígitos.") String codigo) {
     }
 
     /** O CNPJ pode vir formatado ou só com dígitos; o servidor valida e normaliza. */
@@ -73,6 +82,22 @@ public final class Requests {
             @Size(max = 3) Set<RegimeContratacao> regimes,
             /** A ONG atesta que o(a) assistido(a) assinou o termo de consentimento para o tratamento dos dados. */
             @AssertTrue(message = "É necessário confirmar o consentimento do(a) assistido(a).") boolean consentimentoConfirmado) {
+    }
+
+    /** Edição do cadastro do candidato: os mesmos campos do cadastro, sem refazer o consentimento. */
+    public record CandidatoEdicaoRequest(
+            @NotBlank String nomeCompleto,
+            @NotNull @Past LocalDate dataNascimento,
+            @NotBlank @Size(max = 9) String cep,
+            @NotNull ModeloTrabalho modeloTrabalhoPref,
+            @Valid List<TagRequest> tags,
+            Escolaridade escolaridade,
+            Genero genero,
+            RacaCor racaCor,
+            @Size(max = 3) Set<RegimeContratacao> regimes) {
+    }
+
+    public record NotificacoesRequest(boolean ativas) {
     }
 
     public record VagaRequest(

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { Button, Card, Field, Notice, Skeleton, spring } from "@/components/ui";
+import { Button, Card, Field, Notice, Skeleton, Switch, spring } from "@/components/ui";
+import { SegundoFator } from "@/components/SegundoFator";
 import { ApiError, api, baixar, logout } from "@/lib/api";
 import { homeFor } from "@/lib/jwt";
 import type { ContaDados } from "@/lib/types";
@@ -46,6 +47,8 @@ export default function ContaPage() {
           <PrivacidadeCard dados={dados} />
         </div>
       )}
+      {dados && dados.papel !== "ADMIN" && <NotificacoesCard ativo={dados.notificacoesEmail} onMudou={carregar} />}
+      {dados?.papel === "ADMIN" && <div className="mt-4"><SegundoFator /></div>}
       {dados && (
         <Card className="mt-4 flex items-center justify-between gap-4 p-6">
           <div>
@@ -56,6 +59,29 @@ export default function ContaPage() {
         </Card>
       )}
     </Shell>
+  );
+}
+
+function NotificacoesCard({ ativo, onMudou }: { ativo: boolean; onMudou: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string>();
+  async function alternar() {
+    setBusy(true); setErro(undefined);
+    try { await api("conta/notificacoes", { method: "PUT", body: { ativas: !ativo } }); await onMudou(); }
+    catch (e) { setErro(msg(e)); } finally { setBusy(false); }
+  }
+  return (
+    <Card className="mt-4 p-6">
+      <h2 className="title mb-1 text-2xl">Avisos por e-mail</h2>
+      <p className="mb-4 text-sm text-mute">
+        Novas sugestões, candidato enviado, entrevista e contratação. Os e-mails nunca trazem nomes de candidatos.
+      </p>
+      {erro && <div className="mb-3"><Notice>{erro}</Notice></div>}
+      <div className="flex items-center justify-between gap-4 text-sm font-medium">
+        <span>{ativo ? "Ligados" : "Desligados"}</span>
+        <Switch label="Avisos por e-mail" checked={ativo} disabled={busy} onChange={alternar} />
+      </div>
+    </Card>
   );
 }
 

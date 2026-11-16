@@ -7,6 +7,7 @@ import com.jaguata.plataforma.exception.EmailNaoVerificadoException;
 import com.jaguata.plataforma.exception.ServicoExternoException;
 import com.jaguata.plataforma.exception.SessaoInvalidaException;
 import com.jaguata.plataforma.exception.TokenInvalidoException;
+import com.jaguata.plataforma.exception.TotpRequeridoException;
 import com.jaguata.plataforma.exception.RecursoNaoEncontradoException;
 import com.jaguata.plataforma.exception.RegraNegocioException;
 import com.jaguata.plataforma.exception.TentativasExcedidasException;
@@ -84,6 +85,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail emailNaoVerificado(EmailNaoVerificadoException e) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
         pd.setProperty("codigo", "EMAIL_NAO_VERIFICADO");
+        return pd;
+    }
+
+    /** 401 com código estável: o frontend mostra o campo do código de 6 dígitos. */
+    @ExceptionHandler(TotpRequeridoException.class)
+    ProblemDetail totpRequerido(TotpRequeridoException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        pd.setProperty("codigo", "TOTP_REQUERIDO");
         return pd;
     }
 

@@ -22,6 +22,14 @@ spring:
       mail.smtp.writetimeout: 8000
   flyway:
     enabled: true
+  data:
+    redis:                       # usado só com RATE_LIMIT_STORE=redis (várias réplicas do backend)
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 500ms             # falha rápido: o limitador cai para o modo local se o Redis não responder
+      repositories:
+        enabled: false
 
 server:
   max-http-request-header-size: 16KB
@@ -65,6 +73,9 @@ app:
     login-max-failures: ${LOGIN_MAX_FAILURES:5}      # falhas seguidas até bloquear a conta
     login-lock-minutes: ${LOGIN_LOCK_MINUTES:15}     # duração do bloqueio
     max-body-bytes: ${MAX_BODY_BYTES:65536}
+    refresh-grace-segundos: ${REFRESH_GRACE_SEGUNDOS:10}   # tolerância a renovações simultâneas do mesmo refresh token
+    sessao-cache-segundos: ${SESSAO_CACHE_SEGUNDOS:5}      # cache da checagem "sessão ativa" do access token
+    totp-chave: ${TOTP_KEY:}                               # cifra dos segredos 2FA; vazia = derivada de JWT_SECRET
     rate-limit:
       enabled: ${RATE_LIMIT_ENABLED:true}
       login-per-minute: ${RATE_LIMIT_LOGIN_PER_MINUTE:10}      # por IP
@@ -74,3 +85,4 @@ app:
       conta-per-hour: ${RATE_LIMIT_CONTA_PER_HOUR:10}           # e-mails transacionais (verificar/esqueci senha), por IP
       # Nº de proxies CONFIÁVEIS na frente do backend. 0 = ignora X-Forwarded-For (seguro por padrão).
       trusted-proxy-hops: ${RATE_LIMIT_TRUSTED_PROXY_HOPS:0}
+      store: ${RATE_LIMIT_STORE:memory}                        # memory | redis (compartilha limites e bloqueio de login entre réplicas)

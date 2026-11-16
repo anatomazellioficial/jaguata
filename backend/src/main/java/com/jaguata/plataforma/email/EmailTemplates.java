@@ -57,6 +57,34 @@ public class EmailTemplates {
                 """.formatted(base));
     }
 
+    private String rodape(String caminho) {
+        return "Abrir a Jaguatá: " + base + caminho + "\n\n"
+                + "Você recebe este aviso porque as notificações estão ligadas. Para desligar, vá em Minha conta ("
+                + base + "/conta).\n\nEquipe Jaguatá\n";
+    }
+
+    public Mensagem novasSugestoes(String vaga, int quantidade) {
+        return new Mensagem("Novas sugestões de candidatos na Jaguatá", "Olá!\n\n"
+                + (quantidade == 1 ? "Há 1 nova sugestão de candidato(a)" : "Há " + quantidade + " novas sugestões de candidatos")
+                + " aguardando a sua análise para a vaga \"" + vaga + "\".\n\n" + rodape("/ong"));
+    }
+
+    public Mensagem candidatoEnviado(String vaga) {
+        return new Mensagem("Uma ONG enviou um candidato para a sua vaga", "Olá!\n\nUma ONG parceira chancelou e enviou "
+                + "um(a) candidato(a) para a vaga \"" + vaga + "\". Veja o perfil e decida os próximos passos.\n\n"
+                + rodape("/empresa"));
+    }
+
+    public Mensagem convocacao(String vaga) {
+        return new Mensagem("Um(a) candidato(a) foi chamado(a) para entrevista", "Olá!\n\nA empresa chamou um(a) dos "
+                + "seus assistidos para entrevista na vaga \"" + vaga + "\".\n\n" + rodape("/ong"));
+    }
+
+    public Mensagem contratacao(String vaga) {
+        return new Mensagem("Um(a) candidato(a) foi contratado(a)!", "Olá!\n\nBoa notícia: um(a) dos seus assistidos foi "
+                + "contratado(a) na vaga \"" + vaga + "\".\n\n" + rodape("/ong"));
+    }
+
     public Mensagem contaExcluida() {
         return new Mensagem("Sua conta Jaguatá foi excluída", """
                 Olá!

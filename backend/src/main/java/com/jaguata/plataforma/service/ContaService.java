@@ -3,6 +3,8 @@ package com.jaguata.plataforma.service;
 import com.jaguata.plataforma.conta.AuditoriaService;
 import com.jaguata.plataforma.conta.SessaoService;
 import com.jaguata.plataforma.conta.TokenContaService;
+import com.jaguata.plataforma.conta.Termos;
+import com.jaguata.plataforma.security.TermosAceite;
 import com.jaguata.plataforma.domain.Empresa;
 import com.jaguata.plataforma.domain.Ong;
 import com.jaguata.plataforma.domain.Usuario;
@@ -50,13 +52,15 @@ public class ContaService {
     private final AuditoriaService auditoria;
     private final PasswordEncoder encoder;
     private final LoginAttemptService tentativas;
+    private final TermosAceite termosAceite;
     private final Duration validadeEmail;
     private final Duration validadeSenha;
 
     public ContaService(UsuarioRepository usuarios, EmpresaRepository empresas, OngRepository ongs,
                         TokenContaService tokens, SessaoService sessoes, EmailSender emails, EmailTemplates modelos,
                         AuditoriaService auditoria, PasswordEncoder encoder, LoginAttemptService tentativas,
-                        SecurityProperties props) {
+                        SecurityProperties props, TermosAceite termosAceite) {
+        this.termosAceite = termosAceite;
         this.usuarios = usuarios;
         this.empresas = empresas;
         this.ongs = ongs;
@@ -156,6 +160,25 @@ public class ContaService {
         sessoes.encerrarTodas(usuarioId);
         Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> new RecursoNaoEncontradoException("Usuário", usuarioId));
         auditoria.registrar(usuarioId, u.getPapel().name(), "SESSOES_ENCERRADAS", "usuario", usuarioId, null);
+    }
+
+    // ------------------------------------------------------------------ termos e notificações
+    /** Registra o aceite da versão vigente dos Termos (quem aceitou uma versão anterior fica bloqueado até aceitar). */
+    @Transactional
+    public void aceitarTermos(UUID usuarioId) {
+        Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> new RecursoNaoEncontradoException("Usuário", usuarioId));
+        u.setTermosVersao(Termos.VERSAO);
+        u.setTermosAceitosEm(OffsetDateTime.now());
+        auditoria.registrar(usuarioId, u.getPapel().name(), "TERMOS_ACEITOS", "usuario", usuarioId, "versao=" + Termos.VERSAO);
+        termosAceite.invalidar(usuarioId);
+    }
+
+    @Transactional
+    public void notificacoes(UUID usuarioId, boolean ativas) {
+        Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> new RecursoNaoEncontradoException("Usuário", usuarioId));
+        u.setNotificacoesEmail(ativas);
+        auditoria.registrar(usuarioId, u.getPapel().name(), "NOTIFICACOES_" + (ativas ? "LIGADAS" : "DESLIGADAS"),
+                "usuario", usuarioId, null);
     }
 
     // ------------------------------------------------------------------ direitos do titular

@@ -14,7 +14,16 @@ public record SecurityProperties(
         /** Validade do refresh token (a sessão "lembrada"). O access token é curto (app.jwt.ttl). */
         @DefaultValue("30") int refreshDias,
         @DefaultValue("24") int tokenEmailHoras,
-        @DefaultValue("30") int tokenSenhaMinutos) {
+        @DefaultValue("30") int tokenSenhaMinutos,
+        /**
+         * Tolerância para duas renovações simultâneas do mesmo refresh token (várias instâncias do BFF ou abas):
+         * dentro desta janela, reapresentar um token já trocado NÃO derruba a família. 0 = reuso sempre derruba.
+         */
+        @DefaultValue("10") int refreshGraceSegundos,
+        /** Por quanto tempo uma instância guarda "esta sessão está ativa" (a revogação vale na hora na instância que revogou). */
+        @DefaultValue("5") int sessaoCacheSegundos,
+        /** Chave (texto) para cifrar os segredos TOTP em repouso. Vazia = derivada de JWT_SECRET. */
+        @DefaultValue("") String totpChave) {
 
     public record Limites(
             @DefaultValue("true") boolean enabled,
@@ -32,6 +41,8 @@ public record SecurityProperties(
              * Quantos proxies confiáveis existem na frente da aplicação. 0 = ignora X-Forwarded-For
              * (único valor seguro se o backend for acessível diretamente).
              */
-            @DefaultValue("0") int trustedProxyHops) {
+            @DefaultValue("0") int trustedProxyHops,
+            /** Onde ficam os contadores: "memory" (por instância) ou "redis" (compartilhado entre réplicas). */
+            @DefaultValue("memory") String store) {
     }
 }

@@ -55,9 +55,12 @@ public class MatchService {
     private final MatchScoreCalculator score;
     private final AuditoriaService auditoria;
     private final ObjectMapper json;
+    private final NotificacaoService notificacoes;
 
     public MatchService(VagaRepository vagas, CandidatoRepository candidatos, MatchRepository matches,
-                        MatchScoreCalculator score, AuditoriaService auditoria, ObjectMapper json) {
+                        MatchScoreCalculator score, AuditoriaService auditoria, ObjectMapper json,
+                        NotificacaoService notificacoes) {
+        this.notificacoes = notificacoes;
         this.vagas = vagas;
         this.candidatos = candidatos;
         this.matches = matches;
@@ -133,7 +136,11 @@ public class MatchService {
                 .map(Candidatado::match)
                 .toList();
 
-        return matches.saveAll(novos);
+        List<Match> salvos = matches.saveAll(novos);
+        // um aviso por ONG (com a quantidade), nunca por candidato e sem nomes
+        salvos.stream().collect(Collectors.groupingBy(m -> m.getOng().getId(), Collectors.counting()))
+                .forEach((ongId, qtd) -> notificacoes.novasSugestoes(ongId, vaga.getTituloExibicao(), qtd.intValue()));
+        return salvos;
     }
 
     private static Set<String> skillsDe(Candidato c) {
@@ -188,6 +195,7 @@ public class MatchService {
             auditoria.registrarComoAtual("MATCH_CONTRATADO", "match", m.getId(), "vaga preenchida");
             // contratou: a vaga é preenchida e as demais pendências dela são encerradas
             m.getVaga().setStatus(StatusVaga.PREENCHIDA);
+            notificacoes.contratacao(m.getOng().getId(), m.getVaga().getTituloExibicao());
             matches.encerrarPendenciasDaVaga(m.getVaga().getId(), m.getId(),
                     List.of(StatusMatch.SUGERIDO, StatusMatch.ENVIADO, StatusMatch.ENTREVISTA), StatusMatch.RECUSADO,
                     OffsetDateTime.now());
@@ -196,6 +204,11 @@ public class MatchService {
 
         m.setStatus(destino);
         auditoria.registrarComoAtual("MATCH_" + destino.name(), "match", m.getId(), null);
+        if (destino == StatusMatch.ENVIADO) {
+            notificacoes.candidatoEnviado(m.getVaga().getEmpresa().getId(), m.getVaga().getTituloExibicao());
+        } else if (destino == StatusMatch.ENTREVISTA) {
+            notificacoes.convocacao(m.getOng().getId(), m.getVaga().getTituloExibicao());
+        }
         return m;
     }
 }

@@ -115,6 +115,11 @@ BACKEND_URL=http://localhost:8080 npm run dev
 | `RATE_LIMIT_TRUSTED_PROXY_HOPS` | `0` | Nº de proxies confiáveis à frente (veja [Segurança](#segurança)). |
 | `LOGIN_MAX_FAILURES` / `LOGIN_LOCK_MINUTES` | `5` / `15` | Bloqueio da conta após falhas seguidas de login. |
 | `MAX_BODY_BYTES` | `65536` | Tamanho máximo do corpo das requisições. |
+| `RATE_LIMIT_STORE` | `memory` | `memory` (por instância) ou `redis` (limites e bloqueio de login **compartilhados** entre réplicas). |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | `localhost` / `6379` / — | Só usados com `RATE_LIMIT_STORE=redis`. |
+| `REFRESH_GRACE_SEGUNDOS` | `10` | Tolerância a renovações simultâneas do mesmo refresh token (várias réplicas do BFF). `0` desliga. |
+| `SESSAO_CACHE_SEGUNDOS` | `5` | Cache da checagem "sessão ativa" do access token (revogação vale na hora na instância que revoga; nas outras, em até este prazo). |
+| `TOTP_KEY` | derivada de `JWT_SECRET` | Chave que cifra os segredos do 2FA em repouso. Defina uma própria em produção. |
 
 ### Frontend
 
@@ -166,16 +171,22 @@ Critério que a vaga não exige vale o máximo. Dados antigos sem os novos campo
 
 **Vagas afirmativas (opt-in):** a empresa escolhe grupos (PCD, egressos, 50+, mulheres, pessoas negras, indígenas, pessoas trans e não binárias) e **precisa justificar** (mín. 20 caracteres; a ação fica na auditoria). Os grupos só **somam pontos** no ranking; ninguém é excluído.
 
-**Privacidade das autodeclarações:** gênero e raça/cor são opcionais, declarados pelo(a) assistido(a), usados só para esse critério, **nunca expostos às empresas** (nem nos matches, nem nos motivos), exportados apenas ao próprio titular e apagados na anonimização. Limitação: como a pontuação é visível, uma empresa que cria vaga afirmativa para um único grupo poderia inferir pertencimento pela diferença de 10 pontos; os motivos não nomeiam grupos para reduzir isso.
+**Privacidade das autodeclarações:** gênero e raça/cor são opcionais, declarados pelo(a) assistido(a), usados só para esse critério, **nunca expostos às empresas** (nem nos matches, nem nos motivos), exportados apenas ao próprio titular e apagados na anonimização. **A empresa não recebe a nota:** vê só a **posição no ranking** (`#1`, `#2`…) e os motivos **sem** o critério de prioridade; a ONG, que conhece as autodeclarações dos seus assistidos, vê a nota completa. Isso elimina a dedução direta por "10 pontos de diferença". Limitação residual: uma empresa que abre vaga afirmativa para um único grupo ainda pode suspeitar de quem está acima de quem; reduz-se, não se elimina.
 
 **Áreas de atuação da ONG:** `GET`/`PUT /api/ongs/{id}/setores`. Catálogos de formulários em `GET /api/cardapio/perfil`.
 
 ## Contas e LGPD
 
+### Termos e avisos
+- **Novo aceite dos Termos**: ao mudar `Termos.VERSAO`, empresas e ONGs que aceitaram uma versão anterior recebem `403` com `codigo: TERMOS_DESATUALIZADOS` em toda a API (exceto `/api/conta/**` e `/api/auth/**`) e o frontend leva a `/aceitar-termos`. O aceite registra versão e data na auditoria.
+- **Avisos por e-mail** (ligados por padrão; desliga-se em *Minha conta*): ONG recebe "novas sugestões", "candidato chamado para entrevista" e "contratação"; a empresa recebe "ONG enviou um candidato". Os e-mails **nunca citam nome de candidato** (só o título da vaga e quantidades), vão a quem tem o e-mail verificado e só **depois do commit** da operação.
+
 ### Contas e sessões
 - **Verificação de e-mail**: o cadastro envia um link (24 h, uso único). Sem confirmar, o login responde `403` com `codigo: EMAIL_NAO_VERIFICADO` — só depois de a senha estar correta, para o login não revelar quais e-mails existem. Há reenvio (no máximo 1 por minuto por conta).
 - **Recuperação de senha**: `esqueci` responde sempre `202`, exista ou não o e-mail. O link (30 min, uso único) só é gasto quando a nova senha passa na política. Toda troca de senha **encerra todas as sessões** e envia um aviso de segurança por e-mail.
 - **Sessões**: access token JWT de **15 min** + **refresh token opaco e rotativo** (30 dias). Cada renovação revoga o token anterior; **reapresentar um token já usado revoga a sessão inteira** (indício de roubo). Logout revoga no servidor. Só o hash dos tokens vai para o banco.
+- **Logout, troca de senha e "sair de todos" valem na hora**: o access token carrega o `sid` (a sessão do refresh token) e só é aceito enquanto essa sessão estiver ativa (consulta com cache de poucos segundos). Antes, um token já emitido seguia válido até expirar.
+- **Segundo fator (TOTP, RFC 6238) para administradores**: ativação em *Minha conta* (QR code gerado no navegador; o segredo fica cifrado com AES-GCM no banco). Com o 2FA ligado, o login exige o código; código errado conta para o bloqueio da conta, e um mesmo código não vale duas vezes (anti-replay). Desativar exige senha **e** código novo. Ligar o 2FA é opcional (recomendado a todo admin); não há códigos de recuperação: quem perder o aparelho precisa que alguém com acesso ao banco limpe `usuarios.totp_*`.
 - **BFF**: o navegador só tem cookies `httpOnly` (access em `/`, refresh restrito a `/api`). O BFF renova o access sozinho; renovações paralelas compartilham uma única chamada e há uma janela de 30 s para requisições atrasadas, para a rotação não ser confundida com ataque.
 - **Conta**: troca de senha, "sair de todos os dispositivos", cópia dos dados e exclusão do acesso (com senha) em `/conta`.
 - Tokens e sessões expirados são limpos diariamente.
@@ -214,7 +225,10 @@ Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erro
 | `GET /api/admin/ongs` · `/resumo` · `/auditoria` · `POST /api/admin/ongs/{id}/verificar` · `/revogar` | admin | Verificação de ONGs, indicadores e trilha de auditoria |
 | `GET /api/ongs/{id}/candidatos` · `…/{cid}/dados` · `DELETE …/{cid}` | ONG dona | Lista paginada, exportação e anonimização (LGPD) |
 | `/api/auth/refresh` · `/logout` · `/email/*` · `/senha/*` | público | Sessão, verificação de e-mail e recuperação de senha |
-| `/api/conta/*` | autenticado | Troca de senha, sessões, dados e exclusão da conta |
+| `/api/conta/*` | autenticado | Troca de senha, sessões, dados e exclusão da conta; `GET /conta/termos` e `POST /conta/termos/aceitar`; `PUT /conta/notificacoes`; `/conta/2fa/*` (admin) |
+| `PUT`/`DELETE /api/vagas/{id}` | empresa dona | Edita (aberta/pausada, sem candidatos enviados ou em entrevista; descarta as sugestões antigas) ou exclui (sem candidatos em andamento ou contratados) |
+| `GET`/`PUT /api/ongs/{id}/candidatos/{cid}` | ONG dona | Carrega e edita o cadastro (as sugestões ainda não enviadas são descartadas); "excluir" continua sendo a anonimização (LGPD) |
+| `GET /api/cardapio/skills` | autenticado | Habilidades sugeridas (texto livre continua permitido e é padronizado quando coincide com o catálogo) |
 
 Contratar é terminal: fecha a vaga (reabra com `PATCH /api/vagas/{id}/status` se precisar de outra contratação; pendências já encerradas não voltam).
 
@@ -227,9 +241,26 @@ Códigos relevantes: `400` dados inválidos (inclui CNPJ com dígito verificador
 ```bash
 cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS real)
 cd frontend && npm run typecheck
+cd frontend && npm test       # Vitest: utilitários, CSP/guarda de rotas (proxy), componentes e fluxo de login com 2FA
+cd frontend && npm run e2e    # Playwright: jornada completa no navegador (veja abaixo)
 ```
 
-A suíte do backend (120 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+### Teste ponta a ponta no navegador (Playwright)
+Roda contra a stack real do *compose*, com as APIs públicas (BrasilAPI) simuladas por um dublê local, para ser determinístico e não depender da internet. Ele cria uma ONG e uma empresa, **verifica a ONG como admin** e percorre: áreas de atuação e cadastro/edição de candidato (ONG); criação de vaga com requisitos e vaga afirmativa, busca com filtros, ranking, "Por quê?", edição e exclusão (empresa); avisos por e-mail e "Sair" na página de Conta; menu inferior no celular; e a tela de aceite de Termos.
+
+```bash
+cd frontend
+npx playwright install chromium              # uma vez
+node e2e/mock-apis.mjs &                     # dublê da BrasilAPI na porta 4010
+# em outro terminal, suba a stack apontando para o dublê e com limites folgados (muitos logins/cadastros seguidos):
+BRASILAPI_URL=http://host.docker.internal:4010 NOMINATIM_URL=http://host.docker.internal:4010 \
+RATE_LIMIT_REGISTRO_PER_HOUR=10000 RATE_LIMIT_LOGIN_PER_MINUTE=10000 JWT_SECRET=... ADMIN_EMAIL=... ADMIN_PASSWORD=... \
+  docker compose up --build -d
+npm run e2e                                  # E2E_BASE / E2E_API / E2E_MAILPIT / ADMIN_EMAIL / ADMIN_PASSWORD se as portas mudarem
+```
+Capturas das telas ficam em `frontend/e2e/telas/` (fora do Git).
+
+A suíte do backend (138 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **endurecimento** (revogação imediata do access token, 2FA TOTP com vetores da RFC 6238, anti-replay, tolerância de refresh simultâneo, rate limit em Redis real compartilhado entre instâncias) **recursos** (aceite de Termos, avisos por e-mail sem dados pessoais, edição e exclusão de vaga e candidato, padronização de habilidades) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
 
 ## Segurança
 
@@ -248,14 +279,16 @@ A suíte do backend (120 testes) cobre: regras de negócio, **matching** (pesos 
 | Consultas de CNPJ/CEP | 30/min | usuário autenticado; sem token, IP (evita virar proxy aberto das APIs públicas) |
 | Bloqueio de conta | 5 falhas seguidas → 15 min | e-mail normalizado (exista ou não, para não vazar cadastros) |
 
-Implementação: *token bucket* em memória com cache limitado (Caffeine), `429` com `Retry-After`. Funciona por instância; para várias réplicas, troque por um armazenamento compartilhado (ex.: Redis).
+Implementação: *token bucket* com `429` e `Retry-After`. Por padrão em memória (Caffeine, por instância). **Para várias réplicas, use Redis** (`RATE_LIMIT_STORE=redis`): o balde é atualizado por um script Lua atômico com o relógio do Redis e o contador de falhas de login também é compartilhado (senão cada réplica daria ao atacante as suas 5 tentativas). Se o Redis cair, cada instância volta ao limitador local (perde precisão, não disponibilidade). No *compose*: `docker compose --profile escala up -d` com `RATE_LIMIT_STORE=redis REDIS_HOST=redis`.
+
+**Várias réplicas do frontend (BFF):** a renovação do refresh token não depende mais de afinidade de sessão. Se duas réplicas renovarem o mesmo token quase ao mesmo tempo, o backend aceita a segunda dentro de `REFRESH_GRACE_SEGUNDOS` (10 s) emitindo outro par na mesma família, em vez de tratar como roubo. Contrapartida: um token roubado reaproveitado dentro dessa janela ainda funciona uma vez; depois dela o reuso derruba a sessão. Se o usuário fez logout, a tolerância não se aplica.
 
 > **IP do cliente atrás de proxy.** Por padrão o backend **ignora** `X-Forwarded-For` (`RATE_LIMIT_TRUSTED_PROXY_HOPS=0`), o único valor seguro se ele puder ser acessado diretamente, pois o cabeçalho seria forjável. Em produção, coloque um proxy reverso (Nginx, Caddy, balanceador da nuvem) na frente do frontend que **anexe** o IP real e **não exponha o frontend diretamente**; então defina `RATE_LIMIT_TRUSTED_PROXY_HOPS=1`. O backend usa a n-ésima entrada **da direita**, ignorando o que o cliente forjar à esquerda. Sem isso, atrás do BFF todos os usuários aparecem com o mesmo IP e compartilham o balde de login.
 
 ### Proteções de entrada e saída
 - Corpo limitado (64 KB por padrão, inclusive requisições *chunked*) → `413`.
 - Erros sem *stack trace*, SQL ou nomes de classe; erro inesperado vira `500` genérico (detalhe só no log). Mensagens de erro do Boot desativadas.
-- Cabeçalhos: API com `Content-Security-Policy: default-src 'none'`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, HSTS, `nosniff`, `Cache-Control: no-store`. Frontend com CSP restritiva, `Permissions-Policy`, COOP e HSTS em produção.
+- Cabeçalhos: API com `Content-Security-Policy: default-src 'none'`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, HSTS, `nosniff`, `Cache-Control: no-store`. Frontend com **CSP por *nonce*** (gerada a cada requisição em `src/proxy.ts`: `script-src` só executa scripts marcados com o nonce da resposta + `strict-dynamic`, sem `unsafe-inline`; estilos de elemento também por nonce e só atributos `style=""`, que não executam código, ficam liberados), `Permissions-Policy`, COOP e HSTS em produção. Como cada resposta leva um nonce, as páginas são renderizadas dinamicamente.
 - **BFF**: verificação de origem em requisições que mudam estado (anti-CSRF, além do `SameSite`), *allowlist* de caracteres nos caminhos do proxy (sem `..`, `%2f`…), `auth/login` bloqueado no proxy (o token nunca volta ao navegador), teto de corpo, respostas autenticadas com `no-store`.
 - CORS desativado: não há consumo direto da API por outras origens.
 
@@ -285,14 +318,15 @@ docker-compose.yml
 - **Dependência de serviços públicos**: BrasilAPI e Nominatim não têm SLA; se ficarem fora do ar, o cadastro e a criação de vagas/candidatos retornam `503`. O porte reflete o que a Receita publica (declaração cadastral), não um cálculo de faturamento feito pela plataforma.
 - **Precisão geográfica**: coordenadas por CEP são o ponto do CEP (ou aproximações por rua/cidade) — adequadas para raios em km, não para endereços exatos.
 - **Textos legais**: Termos e Privacidade são modelos técnicos; precisam de revisão jurídica e de definição de controlador, encarregado (DPO), foro e prazos de retenção (inclusive da auditoria).
-- **Autenticação em dois fatores** (TOTP) para administradores ainda não existe.
-- **Notificações de match** por e-mail (nova sugestão, candidato enviado, convocação) ainda não existem; a infraestrutura de e-mail já está pronta.
-- **Access token**: após logout ou troca de senha, um access token já emitido continua válido até expirar (até 15 min); o refresh token é revogado na hora.
-- **Cache de renovação do BFF** é por processo: com várias instâncias do frontend, use afinidade de sessão.
-- Novo aceite quando os Termos mudarem de versão ainda não é exigido (a versão aceita fica registrada).
-- **Rate limit em memória**: não é compartilhado entre réplicas.
+- **2FA dos administradores é opcional e sem códigos de recuperação** (veja Contas e sessões). Próximos passos: exigir 2FA para o papel ADMIN e gerar códigos de uso único.
+- **Revogação entre réplicas**: o cache de "sessão ativa" é por instância; logout/troca de senha valem na hora onde acontecem e em até `SESSAO_CACHE_SEGUNDOS` (5 s) nas demais.
+- **Cache de renovação do BFF** é por processo (só uma otimização: a tolerância do backend cobre as corridas entre réplicas).
+- **Rate limit** é em memória por padrão; com `RATE_LIMIT_STORE=redis` é compartilhado, mas o Redis passa a ser uma peça a operar (sem persistência: reiniciá-lo zera os contadores).
 - **Bloqueio de conta** permite que terceiros travem temporariamente uma conta alheia (contrapartida conhecida dessa defesa).
-- **CSP do frontend** usa `'unsafe-inline'` por causa da hidratação do Next; o próximo passo é CSP com *nonce*.
+- **CSP**: scripts e elementos `<style>` usam nonce, mas atributos `style=""` seguem liberados (`style-src-attr 'unsafe-inline'`) porque as animações os geram; não executam código.
 - O cadastro revela se um e-mail já existe (`422`); mitigado pelo rate limit.
 - **Pool de ONGs** (distribuir vagas em lote entre várias ONGs) e relatórios de impacto (ESG) estão fora do escopo atual.
+- **Filtro de idade** na busca da empresa não existe de propósito (risco de discriminação; só o Aprendiz tem faixa legal, já aplicada). Se for requisito, valide com o jurídico antes.
+- **Avisos por e-mail** são enviados na hora, um por evento (um por busca, para sugestões); não há resumo diário nem preferências por tipo de aviso.
+- **Excluir candidato** é a anonimização (preserva o histórico das contratações sem identificar a pessoa); não há exclusão física.
 - A logo é uma recriação em SVG/texto; substitua pelo arquivo vetorial oficial quando disponível.

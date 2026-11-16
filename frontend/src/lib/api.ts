@@ -23,10 +23,15 @@ async function parse<T>(res: Response): Promise<T> {
   if (res.status === 401 && typeof window !== "undefined" && AREAS_PRIVADAS.some((a) => location.pathname.startsWith(a))) {
     location.href = `/login?next=${encodeURIComponent(location.pathname)}`;
   }
+  // Termos atualizados: precisa aceitar a nova versão antes de continuar
+  if (res.status === 403 && problem?.codigo === "TERMOS_DESATUALIZADOS" && typeof window !== "undefined"
+      && !location.pathname.startsWith("/aceitar-termos")) {
+    location.href = `/aceitar-termos?next=${encodeURIComponent(location.pathname)}`;
+  }
   const retry = Number(res.headers.get("Retry-After"));
   const espera = retry > 60 ? `${Math.ceil(retry / 60)} min` : retry > 0 ? `${retry} s` : "um instante";
   const msg =
-    problem?.codigo === "EMAIL_NAO_VERIFICADO" ? problem.detail
+    problem?.codigo === "EMAIL_NAO_VERIFICADO" || problem?.codigo === "TERMOS_DESATUALIZADOS" ? problem.detail
     : res.status === 403 ? "Você não tem permissão para esta ação."
     : res.status === 429 ? `Muitas tentativas. Aguarde ${espera} e tente de novo.`
     : problem?.detail ?? "Algo deu errado. Tente novamente.";
@@ -58,11 +63,11 @@ export async function baixar(path: string, nomeArquivo: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function login(email: string, senha: string) {
+export async function login(email: string, senha: string, codigoTotp?: string) {
   const res = await fetch("/api/session/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, senha }),
+    body: JSON.stringify({ email, senha, ...(codigoTotp ? { codigoTotp } : {}) }),
   });
   return parse<{ papel: "EMPRESA" | "ONG" | "ADMIN"; empresaId?: string; ongId?: string }>(res);
 }

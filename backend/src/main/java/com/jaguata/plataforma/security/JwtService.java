@@ -27,7 +27,8 @@ public class JwtService {
         return ttl;
     }
 
-    public String emitir(Usuario u) {
+    /** @param sessaoId família do refresh token: o access token só vale enquanto a sessão estiver ativa. */
+    public String emitir(Usuario u, java.util.UUID sessaoId) {
         Instant agora = Instant.now();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer(issuer)
@@ -35,7 +36,8 @@ public class JwtService {
                 .subject(u.getId().toString())
                 .issuedAt(agora)
                 .expiresAt(agora.plus(ttl))
-                .claim("papel", u.getPapel().name());
+                .claim("papel", u.getPapel().name())
+                .claim("sid", sessaoId.toString());
         if (u.getEmpresaId() != null) claims.claim("empresaId", u.getEmpresaId().toString());
         if (u.getOngId() != null) claims.claim("ongId", u.getOngId().toString());
 

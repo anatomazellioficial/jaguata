@@ -172,9 +172,7 @@ class MatchingTest {
         // cada consulta persiste as sugestões da vaga: uma vaga nova por cenário
 
         JsonNode todos = sugestoes(emp, vaga(emp, "ANALISTA", extras), null);
-        double comSkills = de(todos, "SkExcel").get("matchScore").asDouble();
-        double semSkills = de(todos, "SkNenhuma").get("matchScore").asDouble();
-        assertTrue(comSkills > semSkills);
+        assertTrue(de(todos, "SkExcel").get("posicao").asInt() < de(todos, "SkNenhuma").get("posicao").asInt());
 
         List<String> porSkill = nomes(sugestoes(emp, vaga(emp, "ANALISTA", extras), "skills=Excel,ATENDIMENTO"));
         assertTrue(porSkill.contains("SkExcel"));
@@ -193,15 +191,15 @@ class MatchingTest {
         JsonNode m = de(sugestoes(emp, vaga(emp, "ANALISTA", "\"escolaridadeMinima\":\"MEDIO\""), null), "MotivoA");
         assertNotNull(m);
         JsonNode motivos = m.get("motivos");
-        assertEquals(7, motivos.size());
+        assertEquals(6, motivos.size(), "empresa não recebe o critério PRIORIDADE");
         int max = 0;
-        double pts = 0;
         for (JsonNode x : motivos) {
+            assertNotEquals("PRIORIDADE", x.get("criterio").asText());
             max += x.get("maximo").asInt();
-            pts += x.get("pontos").asDouble();
         }
-        assertEquals(100, max);
-        assertEquals(m.get("matchScore").asDouble(), pts, 0.01);
+        assertEquals(90, max);
+        assertFalse(m.has("matchScore"), "empresa não recebe a nota numérica");
+        assertTrue(m.get("posicao").asInt() >= 1);
     }
 
     @Test
@@ -227,12 +225,20 @@ class MatchingTest {
         ResultActions r = call(HttpMethod.POST, "/api/vagas/" + v + "/matches/sugestoes?raioKm=15&limite=200", null, emp.token())
                 .andExpect(status().isCreated());
         JsonNode todos = body(r);
-        double mulher = de(todos, "AfMulher").get("matchScore").asDouble();
-        double homem = de(todos, "AfHomem").get("matchScore").asDouble();
-        assertEquals(10.0, mulher - homem, 0.01, "grupo priorizado ganha os pontos de PRIORIDADE");
         assertNotNull(de(todos, "AfHomem"), "ninguém é excluído por não pertencer ao grupo");
+        assertTrue(de(todos, "AfMulher").get("posicao").asInt() < de(todos, "AfHomem").get("posicao").asInt(),
+                "grupo priorizado sobe no ranking");
+
+        // a ONG (que conhece as autodeclarações) enxerga os pontos; a empresa, só a posição
+        JsonNode daOng = body(call(HttpMethod.GET, "/api/ongs/" + ong.id() + "/matches", null, ong.token())
+                .andExpect(status().isOk()));
+        double mulher = de(daOng, "AfMulher").get("matchScore").asDouble();
+        double homem = de(daOng, "AfHomem").get("matchScore").asDouble();
+        assertEquals(10.0, mulher - homem, 0.01, "grupo priorizado ganha os pontos de PRIORIDADE");
 
         String texto = todos.toString().toLowerCase();
+        assertFalse(texto.contains("matchscore"));
+        assertFalse(texto.contains("prioridade"));
         assertFalse(texto.contains("\"genero\""));
         assertFalse(texto.contains("racacor"));
         assertFalse(texto.contains("parda"));

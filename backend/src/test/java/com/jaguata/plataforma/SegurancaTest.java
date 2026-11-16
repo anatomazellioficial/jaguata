@@ -108,10 +108,23 @@ class SegurancaTest {
         return n.get("accessToken").asText();
     }
 
+    /** O access token só vale com uma sessão ativa: pega o "sid" de um login real do admin. */
+    String sidAtivo() {
+        try {
+            String t = json.readTree(call(HttpMethod.POST, "/api/auth/login", loginJson("admin@teste.local", "girassol-azul-teste-42"),
+                    null, "10.8.9.9").andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+                    .get("accessToken").asText();
+            String payload = new String(Base64.getUrlDecoder().decode(t.split("[.]")[1]), StandardCharsets.UTF_8);
+            return json.readTree(payload).get("sid").asText();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     String jwtAssinado(String issuer, String papel) {
         Instant agora = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder().issuer(issuer).subject(UUID.randomUUID().toString())
-                .issuedAt(agora).expiresAt(agora.plusSeconds(600)).claim("papel", papel).build();
+                .issuedAt(agora).expiresAt(agora.plusSeconds(600)).claim("papel", papel).claim("sid", sidAtivo()).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
     }

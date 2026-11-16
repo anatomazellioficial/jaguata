@@ -2,10 +2,16 @@ package com.jaguata.plataforma.config;
 
 import com.jaguata.plataforma.security.RateLimitFilter;
 import com.jaguata.plataforma.security.RateLimiter;
+import com.jaguata.plataforma.security.RedisRateLimiter;
 import com.jaguata.plataforma.security.RequestSizeFilter;
+import com.jaguata.plataforma.security.SessaoAtiva;
+import com.jaguata.plataforma.security.TermosAceite;
+import com.jaguata.plataforma.security.TermosFilter;
 import com.jaguata.plataforma.security.SecurityProperties;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -16,6 +22,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
@@ -39,14 +50,26 @@ import java.nio.charset.StandardCharsets;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /** Em memória (por instância) ou em Redis (compartilhado entre réplicas): app.security.rate-limit.store. */
+    /** Relógio injetável (os testes de TOTP controlam o tempo). */
     @Bean
-    RateLimiter rateLimiter() {
+    java.time.Clock relogio() {
+        return java.time.Clock.systemUTC();
+    }
+
+    @Bean
+    RateLimiter rateLimiter(SecurityProperties props, ObjectProvider<StringRedisTemplate> redis) {
+        if ("redis".equalsIgnoreCase(props.rateLimit().store())) {
+            StringRedisTemplate t = redis.getIfAvailable();
+            if (t != null) return new RedisRateLimiter(t);
+        }
         return new RateLimiter();
     }
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationConverter conversor,
-                                    SecurityProperties props, RateLimiter limiter) throws Exception {
+                                    SecurityProperties props, RateLimiter limiter,
+                                    TermosAceite termosAceite) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)     // sem cookies de sessão: Bearer token no header
                 .cors(AbstractHttpConfigurer::disable)     // sem CORS: o navegador só fala com o BFF (mesma origem)
@@ -68,6 +91,7 @@ public class SecurityConfig {
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(conversor)))
                 .addFilterBefore(new RequestSizeFilter(props.maxBodyBytes()), BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new RateLimitFilter(limiter, props.rateLimit()), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new TermosFilter(termosAceite), BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
@@ -88,9 +112,22 @@ public class SecurityConfig {
 
     /** Algoritmo fixado em HS256 (recusa "none" e confusão de algoritmos) e emissor obrigatório. */
     @Bean
-    JwtDecoder jwtDecoder(SecretKey jwtKey, SecurityProperties props) {
+    JwtDecoder jwtDecoder(SecretKey jwtKey, SecurityProperties props, SessaoAtiva sessaoAtiva) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtKey).macAlgorithm(MacAlgorithm.HS256).build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(props.jwtIssuer()));
+        // além de assinatura, emissor e validade: a sessão do token (claim "sid") precisa continuar ativa
+        OAuth2TokenValidator<Jwt> sessao = jwt -> {
+            try {
+                String sid = jwt.getClaimAsString("sid");
+                if (sid != null && sessaoAtiva.ativa(java.util.UUID.fromString(sid))) {
+                    return OAuth2TokenValidatorResult.success();
+                }
+            } catch (IllegalArgumentException ignorado) {
+                // sid malformado: cai na recusa abaixo
+            }
+            return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Sessão encerrada.", null));
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(props.jwtIssuer()), sessao));
         return decoder;
     }
 

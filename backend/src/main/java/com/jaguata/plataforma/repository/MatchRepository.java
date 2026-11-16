@@ -39,6 +39,17 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     boolean existsByCandidatoIdAndStatus(UUID candidatoId, StatusMatch status);
 
+    boolean existsByVagaIdAndStatusIn(UUID vagaId, Collection<StatusMatch> status);
+
+    /** Descarta matches de uma vaga nos status informados (ex.: sugestões que ficaram velhas após uma edição). */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Match m where m.vaga.id = :vagaId and m.status in :status")
+    int apagarDaVaga(@Param("vagaId") UUID vagaId, @Param("status") Collection<StatusMatch> status);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Match m where m.candidato.id = :candidatoId and m.status in :status")
+    int apagarDoCandidato(@Param("candidatoId") UUID candidatoId, @Param("status") Collection<StatusMatch> status);
+
     /**
      * Vaga preenchida: encerra como RECUSADO as demais pendências (sugeridas, enviadas ou em entrevista),
      * para não sobrarem itens sem saída na fila das ONGs. Retorna quantas foram encerradas.

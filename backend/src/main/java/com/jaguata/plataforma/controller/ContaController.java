@@ -2,6 +2,7 @@ package com.jaguata.plataforma.controller;
 
 import com.jaguata.plataforma.dto.Requests.AlterarSenhaRequest;
 import com.jaguata.plataforma.dto.Requests.ExcluirContaRequest;
+import com.jaguata.plataforma.dto.Requests.NotificacoesRequest;
 import com.jaguata.plataforma.dto.Responses.ContaDadosResponse;
 import com.jaguata.plataforma.service.ContaService;
 import jakarta.validation.Valid;
@@ -37,6 +38,26 @@ public class ContaController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void alterarSenha(@Valid @RequestBody AlterarSenhaRequest req, @AuthenticationPrincipal Jwt jwt) {
         contas.alterarSenha(id(jwt), req.senhaAtual(), req.novaSenha());
+    }
+
+    public record TermosEstado(String versaoVigente, boolean pendente) {
+    }
+
+    @GetMapping("/termos")
+    public TermosEstado termos(@AuthenticationPrincipal Jwt jwt) {
+        return new TermosEstado(com.jaguata.plataforma.conta.Termos.VERSAO, contas.dados(id(jwt)).termosPendentes());
+    }
+
+    @PostMapping("/termos/aceitar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void aceitarTermos(@AuthenticationPrincipal Jwt jwt) {
+        contas.aceitarTermos(id(jwt));
+    }
+
+    @PutMapping("/notificacoes")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void notificacoes(@Valid @RequestBody NotificacoesRequest req, @AuthenticationPrincipal Jwt jwt) {
+        contas.notificacoes(id(jwt), req.ativas());
     }
 
     @PostMapping("/sessoes/encerrar")

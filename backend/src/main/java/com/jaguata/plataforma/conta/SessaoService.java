@@ -4,6 +4,7 @@ import com.jaguata.plataforma.domain.Sessao;
 import com.jaguata.plataforma.exception.SessaoInvalidaException;
 import com.jaguata.plataforma.repository.SessaoRepository;
 import com.jaguata.plataforma.security.SecurityProperties;
+import com.jaguata.plataforma.security.SessaoAtiva;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,15 +24,22 @@ public class SessaoService {
 
     private static final Logger log = LoggerFactory.getLogger(SessaoService.class);
 
-    public record Rotacao(UUID usuarioId, String novoRefreshToken) {
+    public record Rotacao(UUID usuarioId, String novoRefreshToken, UUID sessaoId) {
+    }
+
+    public record Aberta(String refreshToken, UUID sessaoId) {
     }
 
     private final SessaoRepository sessoes;
     private final Duration validade;
+    private final Duration graca;
+    private final SessaoAtiva ativas;
 
-    public SessaoService(SessaoRepository sessoes, SecurityProperties props) {
+    public SessaoService(SessaoRepository sessoes, SecurityProperties props, SessaoAtiva ativas) {
         this.sessoes = sessoes;
         this.validade = Duration.ofDays(props.refreshDias());
+        this.graca = Duration.ofSeconds(props.refreshGraceSegundos());
+        this.ativas = ativas;
     }
 
     public Duration getValidade() {
@@ -40,8 +48,9 @@ public class SessaoService {
 
     /** Abre uma sessão nova (nova família) e devolve o refresh token em claro. */
     @Transactional
-    public String abrir(UUID usuarioId, String userAgent) {
-        return criar(usuarioId, UUID.randomUUID(), userAgent).bruto;
+    public Aberta abrir(UUID usuarioId, String userAgent) {
+        UUID familia = UUID.randomUUID();
+        return new Aberta(criar(usuarioId, familia, userAgent).bruto, familia);
     }
 
     @Transactional(noRollbackFor = SessaoInvalidaException.class)
@@ -51,9 +60,16 @@ public class SessaoService {
         OffsetDateTime agora = OffsetDateTime.now();
 
         if (atual.getRevogadaEm() != null) {
+            if (rotacaoConcorrente(atual, agora)) {
+                // duas renovações simultâneas (ex.: duas instâncias do BFF): emite outro par na mesma família,
+                // sem tocar no token já trocado. Vale só dentro da janela de tolerância.
+                Criada fork = criar(atual.getUsuarioId(), atual.getFamilia(), userAgent);
+                return new Rotacao(atual.getUsuarioId(), fork.bruto, atual.getFamilia());
+            }
             // token já usado/revogado sendo apresentado de novo: possível roubo → derruba a família toda
             log.warn("Reuso de refresh token detectado; família revogada.");
             sessoes.revogarFamilia(atual.getFamilia(), agora);
+            ativas.invalidarTodas();
             throw new SessaoInvalidaException();
         }
         if (atual.getExpiraEm().isBefore(agora)) throw new SessaoInvalidaException();
@@ -61,7 +77,16 @@ public class SessaoService {
         Criada nova = criar(atual.getUsuarioId(), atual.getFamilia(), userAgent);
         atual.setRevogadaEm(agora);
         atual.setSubstituidaPor(nova.sessao.getId());
-        return new Rotacao(atual.getUsuarioId(), nova.bruto);
+        return new Rotacao(atual.getUsuarioId(), nova.bruto, atual.getFamilia());
+    }
+
+    /** O token foi TROCADO (não revogado por logout) há pouco, e o sucessor segue vivo ou também foi trocado. */
+    private boolean rotacaoConcorrente(Sessao atual, OffsetDateTime agora) {
+        if (graca.isZero() || atual.getSubstituidaPor() == null) return false;
+        if (atual.getRevogadaEm().plus(graca).isBefore(agora)) return false;
+        return sessoes.findById(atual.getSubstituidaPor())
+                .map(s -> s.getRevogadaEm() == null || s.getSubstituidaPor() != null)
+                .orElse(false);
     }
 
     /** Logout: encerra a família do token (idempotente; token desconhecido é ignorado). */
@@ -70,12 +95,14 @@ public class SessaoService {
         if (bruto == null || bruto.isBlank() || bruto.length() > 128) return;
         sessoes.findByTokenHash(Hashes.sha256(bruto))
                 .ifPresent(s -> sessoes.revogarFamilia(s.getFamilia(), OffsetDateTime.now()));
+        ativas.invalidarTodas();
     }
 
     /** Troca de senha, exclusão da conta ou "sair de todos os dispositivos". */
     @Transactional
     public void encerrarTodas(UUID usuarioId) {
         sessoes.revogarTodas(usuarioId, OffsetDateTime.now());
+        ativas.invalidarTodas();
     }
 
     @Transactional(readOnly = true)

@@ -29,6 +29,20 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # Redis: só para rodar VÁRIAS réplicas do backend (rate limit e bloqueio de login compartilhados).
+  # Uso: docker compose --profile escala up -d   +   RATE_LIMIT_STORE=redis REDIS_HOST=redis
+  redis:
+    image: redis:7-alpine
+    profiles: ["escala"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     depends_on:
@@ -55,6 +69,10 @@ services:
       # Rate limit. TRUSTED_PROXY_HOPS = nº de proxies reversos confiáveis na frente do FRONTEND
       # (0 = ignora X-Forwarded-For; só use >0 se o frontend NÃO for exposto diretamente).
       RATE_LIMIT_TRUSTED_PROXY_HOPS: ${RATE_LIMIT_TRUSTED_PROXY_HOPS:-0}
+      RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-memory}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      TOTP_KEY: ${TOTP_KEY:-}
       RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-10}
       RATE_LIMIT_REGISTRO_PER_HOUR: ${RATE_LIMIT_REGISTRO_PER_HOUR:-5}
       RATE_LIMIT_API_PER_MINUTE: ${RATE_LIMIT_API_PER_MINUTE:-120}

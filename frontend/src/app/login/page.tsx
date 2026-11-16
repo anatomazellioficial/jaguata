@@ -16,6 +16,8 @@ function LoginForm() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string>();
   const [naoVerificado, setNaoVerificado] = useState(false);
+  const [precisaCodigo, setPrecisaCodigo] = useState(false);
+  const [codigo, setCodigo] = useState("");
   const [reenvio, setReenvio] = useState<string>();
   const [loading, setLoading] = useState(false);
 
@@ -26,13 +28,20 @@ function LoginForm() {
     setNaoVerificado(false);
     setLoading(true);
     try {
-      const s = await login(email, senha);
+      const s = await login(email, senha, precisaCodigo ? codigo : undefined);
       const next = params.get("next");
       // só aceita redirecionamento interno (evita open redirect)
       router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : homeFor(s.papel));
       router.refresh();
     } catch (err) {
       setNaoVerificado(err instanceof ApiError && err.codigo === "EMAIL_NAO_VERIFICADO");
+      if (err instanceof ApiError && err.codigo === "TOTP_REQUERIDO") {
+        setPrecisaCodigo(true);   // senha certa: falta o segundo fator
+        setErro(undefined);
+        setLoading(false);
+        return;
+      }
+      if (precisaCodigo) setCodigo("");
       setErro(err instanceof ApiError ? err.message : "Não foi possível entrar.");
       setLoading(false);
     }
@@ -59,6 +68,16 @@ function LoginForm() {
           <Field label="Senha" type="password" autoComplete="current-password" required value={senha} onChange={(e) => setSenha(e.target.value)} />
           <Link href="/esqueci-senha" className="mt-2 inline-block text-xs font-semibold text-brick hover:underline">Esqueci minha senha</Link>
         </div>
+        <AnimatePresence>
+          {precisaCodigo && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+              transition={spring} className="overflow-hidden">
+              <Field label="Código do app autenticador" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+                autoFocus required value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))}
+                hint="Os 6 dígitos que aparecem no seu app." />
+            </motion.div>
+          )}
+        </AnimatePresence>
         {erro && <Notice>{erro}</Notice>}
         <AnimatePresence>
           {naoVerificado && (

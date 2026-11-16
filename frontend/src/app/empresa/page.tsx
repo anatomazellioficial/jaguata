@@ -7,7 +7,7 @@ import { Shell } from "@/components/Shell";
 import {
   Avatar, Button, Card, ChipGroup, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, Stat, StatusBadge, spring,
 } from "@/components/ui";
-import { useCatalogo } from "@/lib/catalogo";
+import { useCatalogo, useSkills } from "@/lib/catalogo";
 import { ApiError, api, getSession } from "@/lib/api";
 import {
   ROTULO_CONTRATO, ROTULO_CRITERIO, ROTULO_MODELO,
@@ -23,6 +23,7 @@ export default function EmpresaPage() {
   const [vagas, setVagas] = useState<Vaga[]>();
   const [erro, setErro] = useState<string>();
   const [sheet, setSheet] = useState(false);
+  const [editando, setEditando] = useState<Vaga>();
 
   const carregar = useCallback(async (id: string) => {
     const [e, v] = await Promise.all([api<Empresa>(`empresas/${id}`), api<Vaga[]>(`empresas/${id}/vagas`)]);
@@ -47,14 +48,16 @@ export default function EmpresaPage() {
     })();
   }, [carregar]);
 
+  const abrirNova = () => { setEditando(undefined); setSheet(true); };
+
   const abertas = vagas?.filter((v) => v.status === "ABERTA").length ?? 0;
 
   return (
     <Shell
       title={empresa?.razaoSocial ?? "Sua empresa"}
       subtitle="Abra vagas pelo cardápio e receba candidatos chancelados pelas ONGs."
-      action={empresaId && empresa ? <Button size="sm" onClick={() => setSheet(true)}>＋ Nova vaga</Button> : undefined}
-      mobileAction={empresaId && empresa ? { label: "Nova vaga", onClick: () => setSheet(true) } : undefined}
+      action={empresaId && empresa ? <Button size="sm" onClick={abrirNova}>＋ Nova vaga</Button> : undefined}
+      mobileAction={empresaId && empresa ? { label: "Nova vaga", onClick: abrirNova } : undefined}
     >
       {erro && <div className="mb-6"><Notice>{erro}</Notice></div>}
 
@@ -77,19 +80,23 @@ export default function EmpresaPage() {
             className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sun/50 text-3xl">✨</motion.div>
           <h2 className="title text-2xl">Publique a sua primeira vaga</h2>
           <p className="mt-2 max-w-sm text-mute">Escolha o cargo no cardápio e deixe o motor de match encontrar candidatos perto de você.</p>
-          <Button className="mt-6" onClick={() => setSheet(true)}>＋ Nova vaga</Button>
+          <Button className="mt-6" onClick={abrirNova}>＋ Nova vaga</Button>
         </Card>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <AnimatePresence initial={false}>
-          {vagas?.map((v, i) => <VagaCard key={v.id} vaga={v} index={i} />)}
+          {vagas?.map((v, i) => (
+            <VagaCard key={v.id} vaga={v} index={i}
+              onEditar={() => { setEditando(v); setSheet(true); }}
+              onExcluida={() => empresaId && carregar(empresaId)} />
+          ))}
         </AnimatePresence>
       </div>
 
       {empresaId && empresa && (
-        <Sheet open={sheet} onClose={() => setSheet(false)} title="Nova vaga">
-          <NovaVaga empresaId={empresaId} empresa={empresa} cargos={cargos}
+        <Sheet open={sheet} onClose={() => setSheet(false)} title={editando ? "Editar vaga" : "Nova vaga"}>
+          <NovaVaga key={editando?.id ?? "nova"} empresaId={empresaId} empresa={empresa} cargos={cargos} vaga={editando}
             onCriada={async () => { setSheet(false); await carregar(empresaId); }} />
         </Sheet>
       )}
@@ -97,19 +104,21 @@ export default function EmpresaPage() {
   );
 }
 
-function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
-  empresaId: string; empresa: Empresa; cargos: Cargo[]; onCriada: () => void;
+function NovaVaga({ empresaId, empresa, cargos, vaga, onCriada }: {
+  empresaId: string; empresa: Empresa; cargos: Cargo[]; vaga?: Vaga; onCriada: () => void;
 }) {
   const [f, setF] = useState({
-    nivelCargo: "ANALISTA" as NivelCargo, tipoContrato: "FIXO" as TipoContrato, modeloTrabalho: "PRESENCIAL" as ModeloTrabalho,
-    cepAtuacao: "", escolaridadeMinima: "", regime: "",
+    nivelCargo: (vaga?.nivelCargo ?? "ANALISTA") as NivelCargo, tipoContrato: (vaga?.tipoContrato ?? "FIXO") as TipoContrato,
+    modeloTrabalho: (vaga?.modeloTrabalho ?? "PRESENCIAL") as ModeloTrabalho,
+    cepAtuacao: vaga?.cepAtuacao ?? "", escolaridadeMinima: vaga?.escolaridadeMinima ?? "", regime: vaga?.regime ?? "",
   });
   const cat = useCatalogo();
-  const [skills, setSkills] = useState<string[]>([]);
+  const catalogoSkills = useSkills();
+  const [skills, setSkills] = useState<string[]>(vaga?.skills ?? []);
   const [novaSkill, setNovaSkill] = useState("");
-  const [afirmativa, setAfirmativa] = useState(false);
-  const [grupos, setGrupos] = useState<string[]>([]);
-  const [justificativa, setJustificativa] = useState("");
+  const [afirmativa, setAfirmativa] = useState((vaga?.gruposPrioritarios.length ?? 0) > 0);
+  const [grupos, setGrupos] = useState<string[]>(vaga?.gruposPrioritarios ?? []);
+  const [justificativa, setJustificativa] = useState(vaga?.justificativaAfirmativa ?? "");
   const [erro, setErro] = useState<string>();
   const [erros, setErros] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -130,8 +139,8 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
     e.preventDefault();
     setErro(undefined); setErros({}); setLoading(true);
     try {
-      await api(`empresas/${empresaId}/vagas`, {
-        method: "POST",
+      await api(vaga ? `vagas/${vaga.id}` : `empresas/${empresaId}/vagas`, {
+        method: vaga ? "PUT" : "POST",
         body: {
           ...f, cepAtuacao: f.cepAtuacao.replace(/\D/g, ""),   // coordenadas são obtidas no servidor, pelo CEP
           escolaridadeMinima: f.escolaridadeMinima || null, regime: f.regime || null, skills,
@@ -190,12 +199,13 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
       <fieldset className="space-y-3">
         <legend className="mb-1.5 text-[13px] font-medium text-mute">Habilidades desejadas (até 15)</legend>
         <div className="flex gap-2">
-          <input aria-label="Habilidade" placeholder="Excel, atendimento, CNH B…" value={novaSkill}
+          <input aria-label="Habilidade" placeholder="Excel, atendimento, CNH B…" value={novaSkill} list="skills-catalogo"
             onChange={(e) => setNovaSkill(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
             className="min-w-0 flex-1 rounded-2xl bg-white/80 px-4 py-2.5 text-sm shadow-[inset_0_0_0_1px_rgba(16,46,80,.10)] outline-none focus:shadow-[inset_0_0_0_1.5px_#e78b48]" />
           <Button type="button" variant="ghost" onClick={addSkill}>＋</Button>
         </div>
+        <datalist id="skills-catalogo">{catalogoSkills.map((s) => <option key={s} value={s} />)}</datalist>
         <div className="flex flex-wrap gap-2">
           {skills.map((t) => (
             <button key={t} type="button" onClick={() => setSkills((s) => s.filter((x) => x !== t))} title="Remover"
@@ -230,12 +240,16 @@ function NovaVaga({ empresaId, empresa, cargos, onCriada }: {
         </AnimatePresence>
       </div>
       {erro && <Notice>{erro}</Notice>}
-      <Button type="submit" loading={loading} className="w-full !py-3.5">Publicar vaga</Button>
+      {vaga && <Notice kind="info">Ao salvar, as sugestões ainda não enviadas por ONGs são descartadas (foram calculadas com os requisitos antigos). É só buscar de novo.</Notice>}
+      <Button type="submit" loading={loading} className="w-full !py-3.5">{vaga ? "Salvar alterações" : "Publicar vaga"}</Button>
     </form>
   );
 }
 
-function VagaCard({ vaga, index }: { vaga: Vaga; index: number }) {
+function VagaCard({ vaga, index, onEditar, onExcluida }: {
+  vaga: Vaga; index: number; onEditar: () => void; onExcluida: () => void;
+}) {
+  const [confirmaExcluir, setConfirmaExcluir] = useState(false);
   const [matches, setMatches] = useState<Match[]>();
   const [raio, setRaio] = useState("20");
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
@@ -266,6 +280,12 @@ function VagaCard({ vaga, index }: { vaga: Vaga; index: number }) {
     } catch (e) { setErro(msg(e)); } finally { setBusy(false); }
   }
 
+  async function excluir() {
+    setErro(undefined);
+    try { await api(`vagas/${vaga.id}`, { method: "DELETE" }); onExcluida(); }
+    catch (e) { setErro(msg(e)); setConfirmaExcluir(false); }
+  }
+
   async function mover(id: string, status: "ENTREVISTA" | "CONTRATADO" | "RECUSADO") {
     setErro(undefined);
     try { await api(`matches/${id}/status`, { method: "PATCH", body: { status } }); await listar(); }
@@ -291,6 +311,21 @@ function VagaCard({ vaga, index }: { vaga: Vaga; index: number }) {
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${vaga.status === "ABERTA" ? "bg-sun/50" : "bg-navy/[.06] text-mute"}`}>
           {vaga.status === "ABERTA" ? "● Aberta" : vaga.status.charAt(0) + vaga.status.slice(1).toLowerCase()}
         </span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {(vaga.status === "ABERTA" || vaga.status === "PAUSADA") && (
+          <Button size="sm" variant="ghost" onClick={onEditar}>Editar</Button>
+        )}
+        {!confirmaExcluir ? (
+          <Button size="sm" variant="ghost" onClick={() => setConfirmaExcluir(true)}>Excluir</Button>
+        ) : (
+          <>
+            <span className="text-xs text-mute">Excluir esta vaga e as sugestões dela?</span>
+            <Button size="sm" variant="danger" onClick={excluir}>Confirmar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmaExcluir(false)}>Cancelar</Button>
+          </>
+        )}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -352,7 +387,12 @@ function VagaCard({ vaga, index }: { vaga: Vaga; index: number }) {
                     )}
                   </div>
                 </div>
-                <ScoreRing score={m.matchScore} />
+                {m.posicao != null && (
+                  <span title="Posição no ranking da vaga"
+                    className="flex h-11 min-w-11 items-center justify-center rounded-full bg-navy/[.06] px-2 text-sm font-bold tabular-nums">
+                    #{m.posicao}
+                  </span>
+                )}
                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {m.status === "SUGERIDO" && <span className="text-xs text-mute">aguardando a ONG</span>}
                   {m.status === "ENVIADO" && <Button size="sm" variant="ghost" onClick={() => mover(m.id, "ENTREVISTA")}>Entrevistar</Button>}

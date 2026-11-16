@@ -14,6 +14,8 @@ public interface SessaoRepository extends JpaRepository<Sessao, UUID> {
 
     Optional<Sessao> findByTokenHash(String tokenHash);
 
+    boolean existsByFamiliaAndRevogadaEmIsNullAndExpiraEmAfter(UUID familia, OffsetDateTime agora);
+
     long countByUsuarioIdAndRevogadaEmIsNullAndExpiraEmAfter(UUID usuarioId, OffsetDateTime agora);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

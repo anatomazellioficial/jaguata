@@ -55,6 +55,19 @@ public class Usuario {
     @Column(name = "senha_alterada_em")
     private OffsetDateTime senhaAlteradaEm;
 
+    /** Segredo TOTP cifrado (AES-GCM). Nulo se nunca configurado. */
+    @Column(name = "totp_segredo", length = 255)
+    private String totpSegredo;
+
+    @Column(name = "notificacoes_email", nullable = false)
+    private boolean notificacoesEmail = true;
+
+    @Column(name = "totp_ativo", nullable = false)
+    private boolean totpAtivo = false;
+
+    @Column(name = "totp_ultimo_passo")
+    private Long totpUltimoPasso;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

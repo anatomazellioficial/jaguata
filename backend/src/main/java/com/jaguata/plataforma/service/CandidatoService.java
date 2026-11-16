@@ -13,6 +13,7 @@ import com.jaguata.plataforma.domain.enums.ModeloTrabalho;
 import com.jaguata.plataforma.domain.enums.RacaCor;
 import com.jaguata.plataforma.domain.enums.RegimeContratacao;
 import com.jaguata.plataforma.domain.enums.StatusMatch;
+import com.jaguata.plataforma.dto.Responses.CandidatoEdicaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoExportacaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResumoResponse;
 import com.jaguata.plataforma.dto.Responses.ParticipacaoResponse;
@@ -101,12 +102,55 @@ public class CandidatoService {
         c.setConsentimentoVersao(Termos.VERSAO);
         c.setConsentimentoUsuarioId(usuarioQueAtesta);
         if (cmd.tags() != null) {
-            cmd.tags().forEach(t -> c.addTag(new CandidatoTag(t.categoria(), t.tag())));
+            cmd.tags().forEach(t -> c.addTag(new CandidatoTag(t.categoria(), padronizar(t))));
         }
         Candidato salvo = candidatos.save(c);
         auditoria.registrar(usuarioQueAtesta, "ONG", "CANDIDATO_CADASTRADO", "candidato", salvo.getId(),
                 "consentimento=" + Termos.VERSAO);
         return salvo;
+    }
+
+    @Transactional(readOnly = true)
+    public CandidatoEdicaoResponse paraEdicao(UUID ongId, UUID candidatoId) {
+        return CandidatoEdicaoResponse.from(daOng(ongId, candidatoId));
+    }
+
+    /** Habilidades (categoria SKILL) são gravadas com o nome padrão do catálogo, quando houver. */
+    private static String padronizar(TagInput t) {
+        return t.categoria() == CategoriaTag.SKILL ? java.util.Objects.requireNonNullElse(Skills.canonica(t.tag()), t.tag()) : t.tag();
+    }
+
+    /** Edição do cadastro. As sugestões ainda não enviadas deste candidato são descartadas (score velho). */
+    @Transactional
+    public Candidato atualizar(UUID ongId, UUID candidatoId, CadastrarCandidatoCommand cmd) {
+        Candidato c = daOng(ongId, candidatoId);
+        if (cmd.dataNascimento() == null
+                || Candidato.calcularIdade(cmd.dataNascimento(), LocalDate.now()) < Candidato.IDADE_MINIMA) {
+            throw new RegraNegocioException(
+                    "Cadastro não permitido: o candidato deve ter " + Candidato.IDADE_MINIMA + " anos completos.");
+        }
+        c.setNomeCompleto(cmd.nomeCompleto());
+        c.setDataNascimento(cmd.dataNascimento());
+        c.setCep(cmd.cep());
+        c.setLat(cmd.lat());
+        c.setLng(cmd.lng());
+        c.setModeloTrabalhoPref(cmd.modeloTrabalhoPref());
+        c.setEscolaridade(cmd.escolaridade());
+        c.setGenero(cmd.genero());
+        c.setRacaCor(cmd.racaCor());
+        c.getRegimes().clear();
+        c.getTags().clear();
+        // o Hibernate insere antes de apagar: sem este flush, regravar a MESMA tag/regime viola a unicidade
+        candidatos.flush();
+        if (cmd.regimes() != null) c.getRegimes().addAll(cmd.regimes());
+        if (cmd.tags() != null) cmd.tags().forEach(t -> c.addTag(new CandidatoTag(t.categoria(), padronizar(t))));
+        candidatos.saveAndFlush(c);
+        int descartadas = matches.apagarDoCandidato(candidatoId, List.of(StatusMatch.SUGERIDO));
+        auditoria.registrarComoAtual("CANDIDATO_ATUALIZADO", "candidato", candidatoId, "sugestoes_descartadas=" + descartadas);
+        Candidato atual = candidatos.findById(candidatoId).orElseThrow();
+        atual.getTags().size();       // coleções preguiçosas: inicializa dentro da transação (o controller mapeia depois)
+        atual.getRegimes().size();
+        return atual;
     }
 
     /** Candidatos ativos da ONG (anonimizados não aparecem), em ordem alfabética. */

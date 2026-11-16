@@ -321,3 +321,17 @@ export function ChipGroup({ label, options, value, onChange, max }: {
     </fieldset>
   );
 }
+
+/** Interruptor no estilo iOS (role="switch"). */
+export function Switch({ checked, onChange, label, disabled }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative h-8 w-[52px] shrink-0 rounded-full transition-colors duration-300 disabled:opacity-50 ${checked ? "bg-orange" : "bg-navy/20"}`}>
+      <motion.span layout transition={{ type: "spring", stiffness: 500, damping: 32 }}
+        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md ${checked ? "right-1" : "left-1"}`} />
+    </button>
+  );
+}
