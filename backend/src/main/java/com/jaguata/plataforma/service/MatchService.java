@@ -45,9 +45,29 @@ public class MatchService {
      * filtráveis (risco de discriminação); a diversidade entra pela vaga afirmativa, que só aumenta o score.
      */
     public record Filtros(ModeloTrabalho modelo, Escolaridade escolaridadeMinima,
-                          Set<String> skillsObrigatorias, RegimeContratacao regime) {
-        public static final Filtros VAZIO = new Filtros(null, null, Set.of(), null);
+                          Set<String> skillsObrigatorias, RegimeContratacao regime,
+                          Integer idadeMin, Integer idadeMax) {
+        public static final Filtros VAZIO = new Filtros(null, null, Set.of(), null, null, null);
+
+        public Filtros(ModeloTrabalho modelo, Escolaridade escolaridadeMinima, Set<String> skillsObrigatorias,
+                       RegimeContratacao regime) {
+            this(modelo, escolaridadeMinima, skillsObrigatorias, regime, null, null);
+        }
     }
+
+    /**
+     * Opções da distribuição: {@code distribuirPorOng} reparte as sugestões entre as ONGs (uma de cada vez, da
+     * melhor para a pior de cada uma) em vez de deixar a ONG com mais candidatos bem pontuados ficar com todas;
+     * {@code excluirCandidatos} tira da busca quem já foi alocado a outra vaga do mesmo lote.
+     */
+    public record Opcoes(boolean distribuirPorOng, Set<UUID> excluirCandidatos) {
+        public static final Opcoes PADRAO = new Opcoes(false, Set.of());
+    }
+
+    public record ResultadoLote(UUID vagaId, String tituloVaga, int sugestoes) {
+    }
+
+    public static final int MAX_VAGAS_LOTE = 50;
 
     private final VagaRepository vagas;
     private final CandidatoRepository candidatos;
@@ -56,11 +76,19 @@ public class MatchService {
     private final AuditoriaService auditoria;
     private final ObjectMapper json;
     private final NotificacaoService notificacoes;
+    private final boolean filtroIdadeLigado;
+
+    /** O filtro de idade existe, mas só funciona se o jurídico aprovar e a configuração for ligada. */
+    public boolean filtroIdadeLigado() {
+        return filtroIdadeLigado;
+    }
 
     public MatchService(VagaRepository vagas, CandidatoRepository candidatos, MatchRepository matches,
                         MatchScoreCalculator score, AuditoriaService auditoria, ObjectMapper json,
-                        NotificacaoService notificacoes) {
+                        NotificacaoService notificacoes,
+                        @org.springframework.beans.factory.annotation.Value("${app.matching.filtro-idade:false}") boolean filtroIdadeLigado) {
         this.notificacoes = notificacoes;
+        this.filtroIdadeLigado = filtroIdadeLigado;
         this.vagas = vagas;
         this.candidatos = candidatos;
         this.matches = matches;
@@ -80,9 +108,15 @@ public class MatchService {
      */
     @Transactional
     public List<Match> gerarSugestoes(UUID vagaId, double raioKm, int limite, Filtros filtros) {
+        return gerarSugestoes(vagaId, raioKm, limite, filtros, Opcoes.PADRAO);
+    }
+
+    @Transactional
+    public List<Match> gerarSugestoes(UUID vagaId, double raioKm, int limite, Filtros filtros, Opcoes opcoes) {
         if (raioKm <= 0 || limite <= 0) {
             throw new RegraNegocioException("Raio e limite devem ser positivos.");
         }
+        validarIdade(filtros);
         Vaga vaga = vagas.findById(vagaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Vaga", vagaId));
 
@@ -90,6 +124,8 @@ public class MatchService {
         List<CandidatoProximo> proximos = candidatos.buscarElegiveisParaVaga(vagaId, raioMetros,
                 filtros.modelo() == null ? null : filtros.modelo().name(),
                 filtros.escolaridadeMinima() == null ? null : filtros.escolaridadeMinima().name(),
+                filtros.idadeMin() == null ? null : java.time.LocalDate.now().minusYears(filtros.idadeMin()),
+                filtros.idadeMax() == null ? null : java.time.LocalDate.now().minusYears(filtros.idadeMax() + 1L).plusDays(1),
                 TETO_CANDIDATOS);
 
         Map<UUID, Candidato> porId = candidatos
@@ -104,6 +140,7 @@ public class MatchService {
         }
 
         List<Candidatado> avaliados = proximos.stream().map(p -> {
+            if (opcoes.excluirCandidatos().contains(p.getCandidatoId())) return null;          // já alocado no lote
             Candidato c = porId.get(p.getCandidatoId());
             Set<String> skillsCandidato = skillsDe(c);
             if (!skillsCandidato.containsAll(obrigatorias)) return null;                       // filtro: skills obrigatórias
@@ -129,12 +166,28 @@ public class MatchService {
             return new Candidatado(m, p.getDistanciaMetros());
         }).filter(java.util.Objects::nonNull).toList();
 
-        List<Match> novos = avaliados.stream()
-                .sorted(Comparator.<Candidatado, java.math.BigDecimal>comparing(a -> a.match().getMatchScore()).reversed()
+        List<Candidatado> ordenados = avaliados.stream()
+                .sorted(Comparator.<Candidatado, java.math.BigDecimal>comparing(x -> x.match().getMatchScore()).reversed()
                         .thenComparingDouble(Candidatado::distancia))
-                .limit(limite)
-                .map(Candidatado::match)
                 .toList();
+        List<Match> novos = new java.util.ArrayList<>();
+        if (opcoes.distribuirPorOng()) {
+            // uma ONG de cada vez (a que tem o melhor candidato primeiro), sempre o melhor que ainda resta dela
+            Map<UUID, java.util.ArrayDeque<Match>> filas = new java.util.LinkedHashMap<>();
+            for (Candidatado x : ordenados) {
+                filas.computeIfAbsent(x.match().getOng().getId(), k -> new java.util.ArrayDeque<>()).add(x.match());
+            }
+            while (novos.size() < limite && !filas.isEmpty()) {
+                java.util.Iterator<java.util.ArrayDeque<Match>> it = filas.values().iterator();
+                while (it.hasNext() && novos.size() < limite) {
+                    java.util.ArrayDeque<Match> fila = it.next();
+                    novos.add(fila.poll());
+                    if (fila.isEmpty()) it.remove();
+                }
+            }
+        } else {
+            ordenados.stream().limit(limite).forEach(x -> novos.add(x.match()));
+        }
 
         List<Match> salvos = matches.saveAll(novos);
         // um aviso por ONG (com a quantidade), nunca por candidato e sem nomes
@@ -155,6 +208,44 @@ public class MatchService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Falha ao serializar o detalhe do score", e);
         }
+    }
+
+    private void validarIdade(Filtros f) {
+        if (f.idadeMin() == null && f.idadeMax() == null) return;
+        if (!filtroIdadeLigado) {
+            throw new RegraNegocioException("O filtro de idade está desabilitado nesta instalação.");
+        }
+        int min = f.idadeMin() == null ? 18 : f.idadeMin();
+        int max = f.idadeMax() == null ? 120 : f.idadeMax();
+        if (min < 18 || max > 120 || min > max) {
+            throw new RegraNegocioException("Faixa de idade inválida (entre 18 e 120 anos, com mínimo menor ou igual ao máximo).");
+        }
+    }
+
+    /**
+     * Busca em lote: roda o match para todas as vagas ABERTAS da empresa, da mais antiga à mais nova. Cada candidato
+     * é sugerido a UMA só vaga do lote (as seguintes o excluem), e com {@code distribuir} as sugestões de cada vaga
+     * são repartidas entre as ONGs. Evita que 10 vagas iguais recebam os mesmos 10 candidatos.
+     */
+    @Transactional
+    public List<ResultadoLote> gerarSugestoesEmLote(UUID empresaId, double raioKm, int limitePorVaga, Filtros filtros,
+                                                    boolean distribuir) {
+        List<Vaga> abertas = vagas.findByEmpresaId(empresaId).stream()
+                .filter(v -> v.getStatus() == StatusVaga.ABERTA)
+                .sorted(Comparator.comparing(Vaga::getCreatedAt)).toList();
+        if (abertas.isEmpty()) throw new RegraNegocioException("Não há vagas abertas para buscar em lote.");
+        if (abertas.size() > MAX_VAGAS_LOTE) {
+            throw new RegraNegocioException("No máximo " + MAX_VAGAS_LOTE + " vagas abertas por busca em lote.");
+        }
+        Set<UUID> alocados = new java.util.HashSet<>();
+        List<ResultadoLote> out = new java.util.ArrayList<>();
+        for (Vaga v : abertas) {
+            List<Match> novos = gerarSugestoes(v.getId(), raioKm, limitePorVaga, filtros,
+                    new Opcoes(distribuir, Set.copyOf(alocados)));
+            novos.forEach(m -> alocados.add(m.getCandidato().getId()));
+            out.add(new ResultadoLote(v.getId(), v.getTituloExibicao(), novos.size()));
+        }
+        return out;
     }
 
     @Transactional(readOnly = true)

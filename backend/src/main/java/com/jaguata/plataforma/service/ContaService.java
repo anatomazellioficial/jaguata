@@ -173,12 +173,29 @@ public class ContaService {
         termosAceite.invalidar(usuarioId);
     }
 
+    /** Preferências dos avisos por e-mail; campos nulos ficam como estão. */
     @Transactional
-    public void notificacoes(UUID usuarioId, boolean ativas) {
+    public void notificacoes(UUID usuarioId, Boolean ativas, Boolean sugestoes, Boolean andamento, Boolean resumoDiario) {
         Usuario u = usuarios.findById(usuarioId).orElseThrow(() -> new RecursoNaoEncontradoException("Usuário", usuarioId));
-        u.setNotificacoesEmail(ativas);
-        auditoria.registrar(usuarioId, u.getPapel().name(), "NOTIFICACOES_" + (ativas ? "LIGADAS" : "DESLIGADAS"),
-                "usuario", usuarioId, null);
+        if (ativas != null) u.setNotificacoesEmail(ativas);
+        if (sugestoes != null) u.setNotifSugestoes(sugestoes);
+        if (andamento != null) u.setNotifAndamento(andamento);
+        if (resumoDiario != null) u.setNotifResumoDiario(resumoDiario);
+        auditoria.registrar(usuarioId, u.getPapel().name(), "NOTIFICACOES_ATUALIZADAS", "usuario", usuarioId,
+                "ativas=" + u.isNotificacoesEmail() + ",sugestoes=" + u.isNotifSugestoes()
+                        + ",andamento=" + u.isNotifAndamento() + ",resumo=" + u.isNotifResumoDiario());
+    }
+
+    /**
+     * Alguém tentou cadastrar um e-mail que já tem conta: em vez de responder "já existe" (o que permitiria listar
+     * quem usa a plataforma), avisa o dono da conta por e-mail.
+     */
+    @Transactional(readOnly = true)
+    public void avisarTentativaDeCadastro(String email) {
+        usuarios.findByEmail(normalizar(email)).ifPresent(u -> {
+            Mensagem m = modelos.tentativaDeCadastro();
+            emails.enviar(u.getEmail(), m.assunto(), m.corpo());
+        });
     }
 
     // ------------------------------------------------------------------ direitos do titular

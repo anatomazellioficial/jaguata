@@ -14,6 +14,9 @@ public interface SessaoRepository extends JpaRepository<Sessao, UUID> {
 
     Optional<Sessao> findByTokenHash(String tokenHash);
 
+    @Query("select distinct s.familia from Sessao s where s.usuarioId = :usuarioId and s.revogadaEm is null")
+    java.util.List<UUID> familiasAtivas(@Param("usuarioId") UUID usuarioId);
+
     boolean existsByFamiliaAndRevogadaEmIsNullAndExpiraEmAfter(UUID familia, OffsetDateTime agora);
 
     long countByUsuarioIdAndRevogadaEmIsNullAndExpiraEmAfter(UUID usuarioId, OffsetDateTime agora);

@@ -64,6 +64,12 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
                                  @Param("novo") StatusMatch novo,
                                  @Param("agora") OffsetDateTime agora);
 
+    @Query("select m from Match m join fetch m.vaga v join fetch v.empresa join fetch m.ong where v.empresa.id = :empresaId")
+    List<Match> doEmpresa(@Param("empresaId") UUID empresaId);
+
+    @Query("select m from Match m join fetch m.vaga v join fetch v.empresa join fetch m.ong o join fetch m.candidato where o.id = :ongId")
+    List<Match> daOng(@Param("ongId") UUID ongId);
+
     @EntityGraph(attributePaths = {"vaga", "candidato"})
     List<Match> findByOngIdAndStatus(UUID ongId, StatusMatch status);
 }

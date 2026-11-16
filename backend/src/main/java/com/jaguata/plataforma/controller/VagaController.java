@@ -52,6 +52,15 @@ public class VagaController {
         this.consulta = consulta;
     }
 
+    public record Recursos(boolean filtroIdade) {
+    }
+
+    /** Recursos que dependem de configuração da instalação (o frontend só mostra o que está ligado). */
+    @GetMapping("/cardapio/recursos")
+    public Recursos recursos() {
+        return new Recursos(matches.filtroIdadeLigado());
+    }
+
     /** Habilidades sugeridas (o texto livre continua permitido). */
     @GetMapping("/cardapio/skills")
     public List<String> catalogoSkills() {
@@ -119,12 +128,15 @@ public class VagaController {
                                               @RequestParam(required = false) ModeloTrabalho modelo,
                                               @RequestParam(required = false) Escolaridade escolaridadeMin,
                                               @RequestParam(required = false) RegimeContratacao regime,
-                                              @RequestParam(required = false) String skills) {
+                                              @RequestParam(required = false) String skills,
+                                              @RequestParam(required = false) Integer idadeMin,
+                                              @RequestParam(required = false) Integer idadeMax,
+                                              @RequestParam(defaultValue = "false") boolean distribuir) {
         Set<String> obrigatorias = skills == null || skills.isBlank() ? Set.of()
                 : Arrays.stream(skills.split(",")).map(String::trim).filter(s -> !s.isEmpty()).limit(15)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        MatchService.Filtros filtros = new MatchService.Filtros(modelo, escolaridadeMin, obrigatorias, regime);
-        Set<UUID> novos = matches.gerarSugestoes(id, raioKm, limite, filtros).stream()
+        MatchService.Filtros filtros = new MatchService.Filtros(modelo, escolaridadeMin, obrigatorias, regime, idadeMin, idadeMax);
+        Set<UUID> novos = matches.gerarSugestoes(id, raioKm, limite, filtros, new MatchService.Opcoes(distribuir, Set.of())).stream()
                 .map(m -> m.getId()).collect(Collectors.toSet());
         return ranking(id).stream().filter(m -> novos.contains(m.id())).toList();
     }

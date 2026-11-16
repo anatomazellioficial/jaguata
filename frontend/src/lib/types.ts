@@ -76,13 +76,26 @@ export interface CandidatoResumo {
 export interface ContaDados {
   id: string; email: string; papel: "EMPRESA" | "ONG" | "ADMIN"; emailVerificado: boolean; criadaEm: string;
   termosVersao: string | null; termosAceitosEm: string | null; senhaAlteradaEm: string | null; sessoesAtivas: number;
-  notificacoesEmail: boolean; termosPendentes: boolean;
+  notificacoesEmail: boolean; notifSugestoes: boolean; notifAndamento: boolean; notifResumoDiario: boolean;
+  termosPendentes: boolean;
   empresa: Empresa | null; ong: { id: string; cnpj: string; razaoSocial: string; verified: boolean } | null;
 }
 export interface Auditoria {
   id: string; quando: string; usuarioId: string | null; papel: string | null; acao: string;
   entidade: string | null; entidadeId: string | null; detalhe: string | null;
 }
+export interface EmpresaImpacto {
+  geradoEm: string; vagasTotal: number; vagasAbertas: number; vagasPreenchidas: number; vagasPausadasOuEncerradas: number;
+  sugestoes: number; candidatosEnviados: number; entrevistas: number; contratacoes: number; ongsParceiras: number;
+  contratacoesPorOng: { ong: string; contratacoes: number }[]; tempoMedioAteContratacaoDias: number | null;
+  vagasAfirmativas: number; contratacoesEmVagasAfirmativas: number;
+}
+export interface OngImpacto {
+  geradoEm: string; candidatosAtivos: number; aguardandoEnvio: number; emAnalise: number; emEntrevista: number;
+  contratacoes: number; recusas: number; taxaColocacaoPct: number | null; tempoMedioAteContratacaoDias: number | null;
+  empresasParceiras: number; contratacoesPorSetor: { setor: string; contratacoes: number }[];
+}
+export interface ResultadoLote { vagaId: string; tituloVaga: string; sugestoes: number }
 export const ROTULO_CRITERIO: Record<string, string> = {
   TERRITORIO: "Proximidade", MODELO: "Modelo de trabalho", SETOR: "Setor x áreas da ONG", FORMACAO: "Formação",
   SKILLS: "Habilidades", REGIME: "Regime", PRIORIDADE: "Vaga afirmativa",

@@ -7,11 +7,12 @@ import { Shell } from "@/components/Shell";
 import {
   Avatar, Button, Card, ChipGroup, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, Stat, StatusBadge, spring,
 } from "@/components/ui";
-import { useCatalogo, useSkills } from "@/lib/catalogo";
+import { EmpresaImpactoView } from "@/components/Impacto";
+import { useCatalogo, useRecursos, useSkills } from "@/lib/catalogo";
 import { ApiError, api, getSession } from "@/lib/api";
 import {
   ROTULO_CONTRATO, ROTULO_CRITERIO, ROTULO_MODELO,
-  type Cargo, type Empresa, type Match, type ModeloTrabalho, type NivelCargo, type TipoContrato, type Vaga,
+  type Cargo, type Empresa, type ResultadoLote, type Match, type ModeloTrabalho, type NivelCargo, type TipoContrato, type Vaga,
 } from "@/lib/types";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
@@ -24,6 +25,9 @@ export default function EmpresaPage() {
   const [erro, setErro] = useState<string>();
   const [sheet, setSheet] = useState(false);
   const [editando, setEditando] = useState<Vaga>();
+  const [secao, setSecao] = useState<"vagas" | "impacto">("vagas");
+  const [versao, setVersao] = useState(0);
+  const [lote, setLote] = useState<{ msg?: string; erro?: string; busy: boolean }>({ busy: false });
 
   const carregar = useCallback(async (id: string) => {
     const [e, v] = await Promise.all([api<Empresa>(`empresas/${id}`), api<Vaga[]>(`empresas/${id}/vagas`)]);
@@ -52,6 +56,17 @@ export default function EmpresaPage() {
 
   const abertas = vagas?.filter((v) => v.status === "ABERTA").length ?? 0;
 
+  async function buscarEmLote() {
+    if (!empresaId) return;
+    setLote({ busy: true });
+    try {
+      const r = await api<ResultadoLote[]>(`empresas/${empresaId}/vagas/sugestoes-em-lote?raioKm=20&limite=20&distribuir=true`, { method: "POST" });
+      const total = r.reduce((n, x) => n + x.sugestoes, 0);
+      setLote({ busy: false, msg: `${total} sugestão(ões) em ${r.length} vaga(s), sem repetir candidatos e repartidas entre as ONGs.` });
+      setVersao((v) => v + 1);
+    } catch (e) { setLote({ busy: false, erro: msg(e) }); }
+  }
+
   return (
     <Shell
       title={empresa?.razaoSocial ?? "Sua empresa"}
@@ -61,11 +76,32 @@ export default function EmpresaPage() {
     >
       {erro && <div className="mb-6"><Notice>{erro}</Notice></div>}
 
+      {empresaId && (
+        <div className="mb-8 print:hidden">
+          <Segmented label="Seção" value={secao} onChange={setSecao}
+            options={[{ value: "vagas", label: "Vagas" }, { value: "impacto", label: "Impacto" }]} />
+        </div>
+      )}
+      {secao === "impacto" && empresaId && <EmpresaImpactoView empresaId={empresaId} />}
+
+      {secao === "vagas" && <>
       {vagas && (
         <div className="mb-10 grid grid-cols-2 gap-3 sm:max-w-md">
           <Stat label="Vagas abertas" value={abertas} accent={abertas > 0} />
           <Stat label="Total de vagas" value={vagas.length} />
         </div>
+      )}
+
+      {abertas >= 2 && (
+        <Card className="mb-6 flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="max-w-md text-sm text-mute">
+            <b className="text-navy">Busca em lote:</b> sugere candidatos para todas as suas vagas abertas de uma vez, sem
+            repetir a mesma pessoa em duas vagas e repartindo entre as ONGs.
+          </p>
+          <Button size="sm" onClick={buscarEmLote} loading={lote.busy}>Buscar em lote</Button>
+          {lote.msg && <div className="basis-full"><Notice kind="ok">{lote.msg}</Notice></div>}
+          {lote.erro && <div className="basis-full"><Notice>{lote.erro}</Notice></div>}
+        </Card>
       )}
 
       {!vagas && !erro && (
@@ -87,12 +123,14 @@ export default function EmpresaPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <AnimatePresence initial={false}>
           {vagas?.map((v, i) => (
-            <VagaCard key={v.id} vaga={v} index={i}
+            <VagaCard key={v.id} vaga={v} index={i} versao={versao}
               onEditar={() => { setEditando(v); setSheet(true); }}
-              onExcluida={() => empresaId && carregar(empresaId)} />
+              onExcluida={() => empresaId && carregar(empresaId)}
+              onAtualizar={() => empresaId && carregar(empresaId)} />
           ))}
         </AnimatePresence>
       </div>
+      </>}
 
       {empresaId && empresa && (
         <Sheet open={sheet} onClose={() => setSheet(false)} title={editando ? "Editar vaga" : "Nova vaga"}>
@@ -119,6 +157,7 @@ function NovaVaga({ empresaId, empresa, cargos, vaga, onCriada }: {
   const [afirmativa, setAfirmativa] = useState((vaga?.gruposPrioritarios.length ?? 0) > 0);
   const [grupos, setGrupos] = useState<string[]>(vaga?.gruposPrioritarios ?? []);
   const [justificativa, setJustificativa] = useState(vaga?.justificativaAfirmativa ?? "");
+  const [quantidade, setQuantidade] = useState("1");
   const [erro, setErro] = useState<string>();
   const [erros, setErros] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -139,15 +178,18 @@ function NovaVaga({ empresaId, empresa, cargos, vaga, onCriada }: {
     e.preventDefault();
     setErro(undefined); setErros({}); setLoading(true);
     try {
-      await api(vaga ? `vagas/${vaga.id}` : `empresas/${empresaId}/vagas`, {
-        method: vaga ? "PUT" : "POST",
-        body: {
-          ...f, cepAtuacao: f.cepAtuacao.replace(/\D/g, ""),   // coordenadas são obtidas no servidor, pelo CEP
-          escolaridadeMinima: f.escolaridadeMinima || null, regime: f.regime || null, skills,
-          gruposPrioritarios: afirmativa ? grupos : [],
-          justificativaAfirmativa: afirmativa ? justificativa : null,
-        },
-      });
+      const corpo = {
+        ...f, cepAtuacao: f.cepAtuacao.replace(/\D/g, ""),   // coordenadas são obtidas no servidor, pelo CEP
+        escolaridadeMinima: f.escolaridadeMinima || null, regime: f.regime || null, skills,
+        gruposPrioritarios: afirmativa ? grupos : [],
+        justificativaAfirmativa: afirmativa ? justificativa : null,
+      };
+      const qtd = Math.max(1, Math.min(20, Number(quantidade) || 1));
+      if (!vaga && qtd > 1) {
+        await api(`empresas/${empresaId}/vagas/lote`, { method: "POST", body: { quantidade: qtd, vaga: corpo } });
+      } else {
+        await api(vaga ? `vagas/${vaga.id}` : `empresas/${empresaId}/vagas`, { method: vaga ? "PUT" : "POST", body: corpo });
+      }
       onCriada();
     } catch (err) {
       setErro(msg(err));
@@ -240,14 +282,21 @@ function NovaVaga({ empresaId, empresa, cargos, vaga, onCriada }: {
         </AnimatePresence>
       </div>
       {erro && <Notice>{erro}</Notice>}
+      {!vaga && (
+        <Field label="Quantidade de vagas" type="number" min={1} max={20} value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value)} error={erros["quantidade"]}
+          hint="Mais de uma cria vagas iguais (até 20), cada uma com o seu próprio funil." />
+      )}
       {vaga && <Notice kind="info">Ao salvar, as sugestões ainda não enviadas por ONGs são descartadas (foram calculadas com os requisitos antigos). É só buscar de novo.</Notice>}
-      <Button type="submit" loading={loading} className="w-full !py-3.5">{vaga ? "Salvar alterações" : "Publicar vaga"}</Button>
+      <Button type="submit" loading={loading} className="w-full !py-3.5">
+        {vaga ? "Salvar alterações" : Number(quantidade) > 1 ? `Publicar ${Math.min(20, Number(quantidade))} vagas` : "Publicar vaga"}
+      </Button>
     </form>
   );
 }
 
-function VagaCard({ vaga, index, onEditar, onExcluida }: {
-  vaga: Vaga; index: number; onEditar: () => void; onExcluida: () => void;
+function VagaCard({ vaga, index, versao, onEditar, onExcluida, onAtualizar }: {
+  vaga: Vaga; index: number; versao: number; onEditar: () => void; onExcluida: () => void; onAtualizar: () => void;
 }) {
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
   const [matches, setMatches] = useState<Match[]>();
@@ -257,6 +306,10 @@ function VagaCard({ vaga, index, onEditar, onExcluida }: {
   const [fEsc, setFEsc] = useState("");
   const [fRegime, setFRegime] = useState("");
   const [fSkills, setFSkills] = useState("");
+  const [fDistribuir, setFDistribuir] = useState(false);
+  const [fIdadeMin, setFIdadeMin] = useState("");
+  const [fIdadeMax, setFIdadeMax] = useState("");
+  const recursos = useRecursos();
   const [aberto, setAberto] = useState<string>();
   const cat = useCatalogo();
   const [busy, setBusy] = useState(false);
@@ -264,7 +317,7 @@ function VagaCard({ vaga, index, onEditar, onExcluida }: {
   const [info, setInfo] = useState<string>();
 
   const listar = useCallback(async () => setMatches(await api<Match[]>(`vagas/${vaga.id}/matches`)), [vaga.id]);
-  useEffect(() => { listar().catch(() => undefined); }, [listar]);
+  useEffect(() => { listar().catch(() => undefined); }, [listar, versao]);
 
   async function buscar() {
     setBusy(true); setErro(undefined); setInfo(undefined);
@@ -274,6 +327,9 @@ function VagaCard({ vaga, index, onEditar, onExcluida }: {
       if (fEsc) q.set("escolaridadeMin", fEsc);
       if (fRegime) q.set("regime", fRegime);
       if (fSkills.trim()) q.set("skills", fSkills.trim());
+      if (fDistribuir) q.set("distribuir", "true");
+      if (recursos?.filtroIdade && fIdadeMin) q.set("idadeMin", fIdadeMin);
+      if (recursos?.filtroIdade && fIdadeMax) q.set("idadeMax", fIdadeMax);
       const novos = await api<Match[]>(`vagas/${vaga.id}/matches/sugestoes?${q}`, { method: "POST" });
       setInfo(novos.length ? `${novos.length} candidato(s) sugerido(s).` : "Nenhum candidato novo dentro do raio.");
       await listar();
@@ -288,7 +344,11 @@ function VagaCard({ vaga, index, onEditar, onExcluida }: {
 
   async function mover(id: string, status: "ENTREVISTA" | "CONTRATADO" | "RECUSADO") {
     setErro(undefined);
-    try { await api(`matches/${id}/status`, { method: "PATCH", body: { status } }); await listar(); }
+    try {
+      await api(`matches/${id}/status`, { method: "PATCH", body: { status } });
+      await listar();
+      if (status === "CONTRATADO") onAtualizar();   // contratar fecha a vaga: recarrega o status dela
+    }
     catch (e) { setErro(msg(e)); }
   }
 
@@ -358,6 +418,17 @@ function VagaCard({ vaga, index, onEditar, onExcluida }: {
                 </Select>
                 <Field label="Habilidades obrigatórias" placeholder="excel, atendimento" value={fSkills}
                   onChange={(e) => setFSkills(e.target.value)} hint="Separe por vírgula." />
+                <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" checked={fDistribuir} onChange={(e) => setFDistribuir(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#e78b48]" />
+                  <span>Distribuir entre ONGs <span className="text-mute">(uma sugestão de cada ONG por vez, em vez de só as mais bem pontuadas)</span></span>
+                </label>
+                {recursos?.filtroIdade && (
+                  <>
+                    <Field label="Idade mínima" type="number" min={18} max={120} value={fIdadeMin} onChange={(e) => setFIdadeMin(e.target.value)} />
+                    <Field label="Idade máxima" type="number" min={18} max={120} value={fIdadeMax} onChange={(e) => setFIdadeMax(e.target.value)} />
+                  </>
+                )}
               </div>
               <p className="mt-2 text-xs text-mute">Filtros usam só critérios profissionais e excluem quem não atende.</p>
             </motion.div>

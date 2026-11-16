@@ -203,6 +203,23 @@ public class CandidatoService {
         auditoria.registrarComoAtual("CANDIDATO_ANONIMIZADO", "candidato", candidatoId, null);
     }
 
+    /**
+     * Exclusão DEFINITIVA: apaga o cadastro, as tags e todos os matches. Só é permitida se a pessoa nunca foi
+     * contratada; com contratação, o histórico precisa ser preservado e o caminho é a anonimização.
+     */
+    @Transactional
+    public void excluirDefinitivamente(UUID ongId, UUID candidatoId) {
+        Candidato c = daOng(ongId, candidatoId);
+        if (matches.existsByCandidatoIdAndStatus(c.getId(), StatusMatch.CONTRATADO)) {
+            throw new RegraNegocioException("Este(a) candidato(a) tem uma contratação registrada. Para preservar o histórico, "
+                    + "use a anonimização em vez da exclusão definitiva.");
+        }
+        matches.apagarDoCandidato(c.getId(), List.of(StatusMatch.values()));
+        auditoria.registrarComoAtual("CANDIDATO_EXCLUIDO", "candidato", candidatoId, null);
+        candidatos.deleteById(candidatoId);
+        candidatos.flush();
+    }
+
     /** 404 (e não 403) para candidato de outra ONG ou já anonimizado: não revela a existência. */
     private Candidato daOng(UUID ongId, UUID candidatoId) {
         Candidato c = candidatos.findById(candidatoId)

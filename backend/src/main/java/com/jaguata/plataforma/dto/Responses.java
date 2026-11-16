@@ -145,12 +145,14 @@ public final class Responses {
                                      java.time.OffsetDateTime criadaEm, String termosVersao,
                                      java.time.OffsetDateTime termosAceitosEm, java.time.OffsetDateTime senhaAlteradaEm,
                                      long sessoesAtivas, EmpresaResponse empresa, OngResponse ong,
-                                     boolean notificacoesEmail, boolean termosPendentes) {
+                                     boolean notificacoesEmail, boolean notifSugestoes, boolean notifAndamento,
+                                     boolean notifResumoDiario, boolean termosPendentes) {
         public static ContaDadosResponse de(Usuario u, Empresa e, Ong o, long sessoes) {
             return new ContaDadosResponse(u.getId(), u.getEmail(), u.getPapel(), u.isEmailVerificado(), u.getCreatedAt(),
                     u.getTermosVersao(), u.getTermosAceitosEm(), u.getSenhaAlteradaEm(), sessoes,
                     e == null ? null : EmpresaResponse.from(e), o == null ? null : OngResponse.from(o),
-                    u.isNotificacoesEmail(), !com.jaguata.plataforma.conta.Termos.VERSAO.equals(u.getTermosVersao()));
+                    u.isNotificacoesEmail(), u.isNotifSugestoes(), u.isNotifAndamento(), u.isNotifResumoDiario(),
+                    !com.jaguata.plataforma.conta.Termos.VERSAO.equals(u.getTermosVersao()));
         }
     }
 

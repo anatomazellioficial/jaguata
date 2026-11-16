@@ -72,6 +72,7 @@ services:
       # (0 = ignora X-Forwarded-For; só use >0 se o frontend NÃO for exposto diretamente).
       RATE_LIMIT_TRUSTED_PROXY_HOPS: ${RATE_LIMIT_TRUSTED_PROXY_HOPS:-0}
       RATE_LIMIT_STORE: ${RATE_LIMIT_STORE:-memory}
+      APP_MATCHING_FILTRO_IDADE: ${FILTRO_IDADE:-false}   # filtro de idade: só ligue com aval do jurídico
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       TOTP_KEY: ${TOTP_KEY:-}

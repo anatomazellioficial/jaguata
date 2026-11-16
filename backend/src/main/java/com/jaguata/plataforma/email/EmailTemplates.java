@@ -1,5 +1,6 @@
 package com.jaguata.plataforma.email;
 
+import com.jaguata.plataforma.service.NotificacaoService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -83,6 +84,31 @@ public class EmailTemplates {
     public Mensagem contratacao(String vaga) {
         return new Mensagem("Um(a) candidato(a) foi contratado(a)!", "Olá!\n\nBoa notícia: um(a) dos seus assistidos foi "
                 + "contratado(a) na vaga \"" + vaga + "\".\n\n" + rodape("/ong"));
+    }
+
+    public Mensagem resumoDiario(NotificacaoService.Resumo r) {
+        StringBuilder corpo = new StringBuilder("Olá!\n\nResumo de ontem na Jaguatá:\n\n");
+        if (r.sugestoes() > 0) corpo.append("• ").append(r.sugestoes()).append(r.sugestoes() == 1 ? " nova sugestão de candidato(a)\n" : " novas sugestões de candidatos\n");
+        if (r.enviados() > 0) corpo.append("• ").append(r.enviados()).append(r.enviados() == 1 ? " candidato(a) enviado(a) para as suas vagas\n" : " candidatos enviados para as suas vagas\n");
+        if (r.entrevistas() > 0) corpo.append("• ").append(r.entrevistas()).append(r.entrevistas() == 1 ? " convocação para entrevista\n" : " convocações para entrevista\n");
+        if (r.contratacoes() > 0) corpo.append("• ").append(r.contratacoes()).append(r.contratacoes() == 1 ? " contratação\n" : " contratações\n");
+        if (!r.vagas().isEmpty()) corpo.append("\nVagas: ").append(String.join(", ", r.vagas())).append("\n");
+        corpo.append("\nAbrir a Jaguatá: ").append(base).append("\n\n")
+                .append("Você recebe este resumo porque escolheu o resumo diário. Para mudar, vá em Minha conta (")
+                .append(base).append("/conta).\n\nEquipe Jaguatá\n");
+        return new Mensagem("Seu resumo diário na Jaguatá", corpo.toString());
+    }
+
+    public Mensagem tentativaDeCadastro() {
+        return new Mensagem("Tentativa de cadastro com o seu e-mail na Jaguatá", """
+                Olá!
+
+                Alguém tentou criar uma conta na Jaguatá usando este e-mail, mas ele já tem uma conta.
+                Se foi você, é só entrar em %s/login (ou redefinir a senha em %s/esqueci-senha).
+                Se não foi você, ignore esta mensagem: nada foi alterado.
+
+                Equipe Jaguatá
+                """.formatted(base, base));
     }
 
     public Mensagem contaExcluida() {

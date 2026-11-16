@@ -62,6 +62,15 @@ public class Usuario {
     @Column(name = "notificacoes_email", nullable = false)
     private boolean notificacoesEmail = true;
 
+    @Column(name = "notif_sugestoes", nullable = false)
+    private boolean notifSugestoes = true;
+
+    @Column(name = "notif_andamento", nullable = false)
+    private boolean notifAndamento = true;
+
+    @Column(name = "notif_resumo_diario", nullable = false)
+    private boolean notifResumoDiario = false;
+
     @Column(name = "totp_ativo", nullable = false)
     private boolean totpAtivo = false;
 

@@ -3,6 +3,10 @@ updates:
   - package-ecosystem: maven
     directory: /backend
     schedule: { interval: weekly }
+    ignore:
+      # versões maiores (Spring Boot, TypeScript, Java...) mudam a base do projeto: migre de propósito, não por bot
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-e-patch:
         update-types: [minor, patch]
@@ -11,6 +15,10 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    ignore:
+      # versões maiores (Spring Boot, TypeScript, Java...) mudam a base do projeto: migre de propósito, não por bot
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-e-patch:
         update-types: [minor, patch]
@@ -23,7 +31,15 @@ updates:
   - package-ecosystem: docker
     directory: /backend
     schedule: { interval: weekly }
+    ignore:
+      # versões maiores (Spring Boot, TypeScript, Java...) mudam a base do projeto: migre de propósito, não por bot
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /frontend
     schedule: { interval: weekly }
+    ignore:
+      # versões maiores (Spring Boot, TypeScript, Java...) mudam a base do projeto: migre de propósito, não por bot
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

@@ -200,7 +200,11 @@ class ApiRestTest {
         call(HttpMethod.POST, "/api/auth/registro/empresa", """
                 {"email":"%s","senha":"%s","cnpj":"%s"}
                 """.formatted(e.email().toUpperCase(), SENHA, cnpj()), null)
-                .andExpect(status().isUnprocessableEntity());
+                // sem enumeração: a resposta é igual à de um cadastro novo (o dono recebe um aviso por e-mail)
+                .andExpect(status().isCreated());
+        org.junit.jupiter.api.Assertions.assertEquals(1, emails.quantos(e.email(), "Tentativa de cadastro"));
+        // a conta original segue intacta: a senha antiga continua valendo
+        login(e.email(), SENHA);
     }
 
     @Test

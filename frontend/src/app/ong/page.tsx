@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
 import { Avatar, Button, Card, ChipGroup, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, StatusBadge, spring } from "@/components/ui";
+import { OngImpactoView } from "@/components/Impacto";
 import { useCatalogo, useSkills } from "@/lib/catalogo";
 import Link from "next/link";
 import { ApiError, api, baixar, getSession } from "@/lib/api";
@@ -28,7 +29,7 @@ export default function OngPage() {
   const [sheet, setSheet] = useState(false);
   const [cadastrados, setCadastrados] = useState(0);
   const [editando, setEditando] = useState<CandidatoEdicao>();
-  const [secao, setSecao] = useState<"funil" | "candidatos" | "areas">("funil");
+  const [secao, setSecao] = useState<"funil" | "candidatos" | "areas" | "impacto">("funil");
 
   useEffect(() => {
     getSession()
@@ -47,13 +48,14 @@ export default function OngPage() {
       {ongId && (
         <div className="mb-8">
           <Segmented label="Seção" value={secao} onChange={setSecao}
-            options={[{ value: "funil", label: "Funil" }, { value: "candidatos", label: "Meus candidatos" }, { value: "areas", label: "Áreas de atuação" }]} />
+            options={[{ value: "funil", label: "Funil" }, { value: "candidatos", label: "Meus candidatos" }, { value: "areas", label: "Áreas de atuação" }, { value: "impacto", label: "Impacto" }]} />
         </div>
       )}
       {ongId && secao === "funil" && <Fila ongId={ongId} novoCadastro={cadastrados} />}
       {ongId && secao === "candidatos" && <ListaCandidatos ongId={ongId} atualizar={cadastrados}
         onEditar={(c) => { setEditando(c); setSheet(true); }} />}
       {ongId && secao === "areas" && <Areas ongId={ongId} />}
+      {ongId && secao === "impacto" && <OngImpactoView ongId={ongId} />}
       {ongId && (
         <Sheet open={sheet} onClose={() => setSheet(false)} title={editando ? "Editar candidato" : "Novo candidato"}>
           <NovoCandidato key={editando?.id ?? "novo"} ongId={ongId} inicial={editando} onCadastrado={() => setCadastrados((n) => n + 1)} onFechar={() => setSheet(false)} />
@@ -194,9 +196,9 @@ function ListaCandidatos({ ongId, atualizar, onEditar }: {
     catch (e) { setErro(msg(e)); }
   }
 
-  async function anonimizar(c: CandidatoResumo) {
+  async function anonimizar(c: CandidatoResumo, definitivo = false) {
     setBusy(c.id); setErro(undefined); setConfirmar(undefined);
-    try { await api(`ongs/${ongId}/candidatos/${c.id}`, { method: "DELETE" }); await carregar(); }
+    try { await api(`ongs/${ongId}/candidatos/${c.id}${definitivo ? "?definitivo=true" : ""}`, { method: "DELETE" }); await carregar(); }
     catch (e) { setErro(msg(e)); } finally { setBusy(undefined); }
   }
 
@@ -239,8 +241,12 @@ function ListaCandidatos({ ongId, atualizar, onEditar }: {
                   <Button size="sm" variant="danger" onClick={() => setConfirmar(c.id)}>Anonimizar</Button>
                 ) : (
                   <>
-                    <span className="basis-full text-right text-xs text-mute sm:basis-auto sm:max-w-[14rem]">Apaga nome, nascimento e CEP. Não dá para desfazer.</span>
-                    <Button size="sm" variant="danger" loading={busy === c.id} onClick={() => anonimizar(c)}>Confirmar</Button>
+                    <span className="basis-full text-right text-xs text-mute sm:basis-auto sm:max-w-[18rem]">
+                      <b>Anonimizar</b> apaga nome, nascimento e CEP e mantém o histórico. <b>Excluir definitivamente</b> apaga tudo
+                      (só para quem nunca foi contratado). Não dá para desfazer.
+                    </span>
+                    <Button size="sm" variant="danger" loading={busy === c.id} onClick={() => anonimizar(c)}>Anonimizar</Button>
+                    <Button size="sm" variant="danger" loading={busy === c.id} onClick={() => anonimizar(c, true)}>Excluir definitivamente</Button>
                     <Button size="sm" variant="ghost" onClick={() => setConfirmar(undefined)}>Cancelar</Button>
                   </>
                 )}

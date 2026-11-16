@@ -185,7 +185,15 @@ Critério que a vaga não exige vale o máximo. Dados antigos sem os novos campo
 
 ### Termos e avisos
 - **Novo aceite dos Termos**: ao mudar `Termos.VERSAO`, empresas e ONGs que aceitaram uma versão anterior recebem `403` com `codigo: TERMOS_DESATUALIZADOS` em toda a API (exceto `/api/conta/**` e `/api/auth/**`) e o frontend leva a `/aceitar-termos`. O aceite registra versão e data na auditoria.
-- **Avisos por e-mail** (ligados por padrão; desliga-se em *Minha conta*): ONG recebe "novas sugestões", "candidato chamado para entrevista" e "contratação"; a empresa recebe "ONG enviou um candidato". Os e-mails **nunca citam nome de candidato** (só o título da vaga e quantidades), vão a quem tem o e-mail verificado e só **depois do commit** da operação.
+- **Avisos por e-mail** (ligados por padrão; em *Minha conta* dá para desligar tudo ou por tipo): ONG recebe "novas sugestões", "candidato chamado para entrevista" e "contratação"; a empresa recebe "ONG enviou um candidato". Há duas preferências por tipo (**novas sugestões** e **andamento do funil**) e a opção **resumo diário**: quem a escolhe não recebe e-mails na hora; os eventos entram numa fila e saem num único e-mail às 08:00 (Brasília; `app.notificacoes.resumo-cron` muda o horário). Os e-mails **nunca citam nome de candidato** (só o título da vaga e quantidades), vão a quem tem o e-mail verificado e o envio imediato só acontece **depois do commit** da operação.
+
+### Lote, distribuição entre ONGs e relatórios
+- **Vagas em lote**: `POST /api/empresas/{id}/vagas/lote` cria até 20 vagas iguais de uma vez (cada uma com o seu funil). No frontend: campo *Quantidade de vagas* no formulário.
+- **Busca em lote**: `POST /api/empresas/{id}/vagas/sugestoes-em-lote` roda o match em **todas as vagas abertas**, da mais antiga à mais nova; cada candidato é sugerido a **uma só vaga** do lote (as seguintes o excluem), evitando que 10 vagas iguais recebam os mesmos 10 nomes.
+- **Distribuir entre ONGs** (`distribuir=true`, também na busca de uma vaga só): as sugestões são repartidas entre as ONGs, uma de cada vez e sempre a melhor que resta de cada uma, em vez de a ONG com mais candidatos bem pontuados ficar com todas.
+- **Relatórios de impacto (ESG)**: `GET /api/empresas/{id}/impacto` e `GET /api/ongs/{id}/impacto` (abas *Impacto*, com impressão/PDF). Trazem **só totais**: vagas, funil, contratações, tempo médio, ONGs ou empresas parceiras, contratações por setor/ONG e quantas foram em vagas marcadas como afirmativas pela própria empresa. **Não há recorte por gênero, raça/cor, deficiência ou qualquer atributo individual**: com poucas contratações, qualquer recorte desses reidentificaria pessoas.
+- **Filtro de idade** (`idadeMin`/`idadeMax` na busca): existe, mas vem **desligado** (`app.matching.filtro-idade=false`; no compose, `FILTRO_IDADE=true` liga). Enquanto estiver desligado a API responde `422` e o frontend não mostra os campos. Só ligue com aval do jurídico: filtrar candidatos por idade pode configurar discriminação; o Aprendiz (18–24) já tem a sua faixa legal aplicada sempre.
+- **Exclusão definitiva de candidato**: `DELETE /api/ongs/{id}/candidatos/{cid}?definitivo=true` apaga cadastro, tags e matches, mas **só se a pessoa nunca foi contratada** (`422` caso contrário); o padrão continua sendo a **anonimização**, que preserva o histórico das contratações. Ambas ficam na auditoria.
 
 ### Contas e sessões
 - **Verificação de e-mail**: o cadastro envia um link (24 h, uso único). Sem confirmar, o login responde `403` com `codigo: EMAIL_NAO_VERIFICADO` — só depois de a senha estar correta, para o login não revelar quais e-mails existem. Há reenvio (no máximo 1 por minuto por conta).
@@ -234,6 +242,9 @@ Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erro
 | `/api/conta/*` | autenticado | Troca de senha, sessões, dados e exclusão da conta; `GET /conta/termos` e `POST /conta/termos/aceitar`; `PUT /conta/notificacoes`; `/conta/2fa/*` (admin) |
 | `PUT`/`DELETE /api/vagas/{id}` | empresa dona | Edita (aberta/pausada, sem candidatos enviados ou em entrevista; descarta as sugestões antigas) ou exclui (sem candidatos em andamento ou contratados) |
 | `GET`/`PUT /api/ongs/{id}/candidatos/{cid}` | ONG dona | Carrega e edita o cadastro (as sugestões ainda não enviadas são descartadas); "excluir" continua sendo a anonimização (LGPD) |
+| `POST /api/empresas/{id}/vagas/lote` · `…/vagas/sugestoes-em-lote` · `GET …/impacto` | empresa dona | Cria vagas em lote, busca em lote (sem repetir candidato; `distribuir`) e relatório de impacto |
+| `GET /api/ongs/{id}/impacto` · `DELETE …/candidatos/{cid}?definitivo=true` | ONG dona | Relatório de impacto; exclusão definitiva (só sem contratação) |
+| `GET /api/cardapio/recursos` | autenticado | Recursos ligados por configuração (ex.: filtro de idade) |
 | `GET /api/cardapio/skills` | autenticado | Habilidades sugeridas (texto livre continua permitido e é padronizado quando coincide com o catálogo) |
 
 Contratar é terminal: fecha a vaga (reabra com `PATCH /api/vagas/{id}/status` se precisar de outra contratação; pendências já encerradas não voltam).
@@ -248,11 +259,11 @@ Códigos relevantes: `400` dados inválidos (inclui CNPJ com dígito verificador
 cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS real)
 cd frontend && npm run typecheck
 cd frontend && npm test       # Vitest (19): utilitários, CSP/guarda de rotas (proxy), SEO, componentes e login com 2FA
-cd frontend && npm run e2e    # Playwright: jornada completa no navegador (veja abaixo)
+cd frontend && npm run e2e    # Playwright (8 testes): jornadas completas no navegador (veja abaixo)
 ```
 
 ### Teste ponta a ponta no navegador (Playwright)
-Roda contra a stack real do *compose*, com as APIs públicas (BrasilAPI) simuladas por um dublê local, para ser determinístico e não depender da internet. Ele cria uma ONG e uma empresa, **verifica a ONG como admin** e percorre: áreas de atuação e cadastro/edição de candidato (ONG); criação de vaga com requisitos e vaga afirmativa, busca com filtros, ranking, "Por quê?", edição e exclusão (empresa); avisos por e-mail e "Sair" na página de Conta; menu inferior no celular; e a tela de aceite de Termos.
+Roda contra a stack real do *compose*, com as APIs públicas (BrasilAPI) simuladas por um dublê local, para ser determinístico e não depender da internet. Ele cria uma ONG e uma empresa, **verifica a ONG como admin** e percorre: **funil completo** (ONG envia → empresa entrevista e contrata, com avisos por e-mail sem nomes), relatórios de impacto, criação e busca em lote, exclusão definitiva, **bloqueio por Termos desatualizados** (altera a versão aceita via `docker exec` no contêiner do banco; defina `E2E_DB_CONTAINER` se o nome mudar), áreas de atuação e cadastro/edição de candidato (ONG); criação de vaga com requisitos e vaga afirmativa, busca com filtros, ranking, "Por quê?", edição e exclusão (empresa); avisos por e-mail e "Sair" na página de Conta; menu inferior no celular; e a tela de aceite de Termos.
 
 ```bash
 cd frontend
@@ -266,7 +277,7 @@ npm run e2e                                  # E2E_BASE / E2E_API / E2E_MAILPIT 
 ```
 Capturas das telas ficam em `frontend/e2e/telas/` (fora do Git).
 
-A suíte do backend (138 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **endurecimento** (revogação imediata do access token, 2FA TOTP com vetores da RFC 6238, anti-replay, tolerância de refresh simultâneo, rate limit em Redis real compartilhado entre instâncias) **recursos** (aceite de Termos, avisos por e-mail sem dados pessoais, edição e exclusão de vaga e candidato, padronização de habilidades) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+A suíte do backend (148 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **endurecimento** (revogação imediata do access token, 2FA TOTP com vetores da RFC 6238, anti-replay, tolerância de refresh simultâneo, rate limit em Redis real compartilhado entre instâncias) **recursos** (aceite de Termos, avisos por e-mail sem dados pessoais, resumo diário e preferências, edição e exclusão de vaga e candidato, exclusão definitiva, padronização de habilidades, cadastro sem enumeração de e-mails, relatórios sem dados de grupos, lote e distribuição entre ONGs, filtro de idade ligado e desligado, revogação de sessão compartilhada via Redis) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
 
 ## Integração contínua (CI)
 
@@ -347,14 +358,14 @@ docker-compose.yml
 - **Precisão geográfica**: coordenadas por CEP são o ponto do CEP (ou aproximações por rua/cidade) — adequadas para raios em km, não para endereços exatos.
 - **Textos legais**: Termos e Privacidade são modelos técnicos; precisam de revisão jurídica e de definição de controlador, encarregado (DPO), foro e prazos de retenção (inclusive da auditoria).
 - **2FA dos administradores é opcional e sem códigos de recuperação** (veja Contas e sessões). Próximos passos: exigir 2FA para o papel ADMIN e gerar códigos de uso único.
-- **Revogação entre réplicas**: o cache de "sessão ativa" é por instância; logout/troca de senha valem na hora onde acontecem e em até `SESSAO_CACHE_SEGUNDOS` (5 s) nas demais.
+- **Revogação entre réplicas**: com `RATE_LIMIT_STORE=redis`, logout, troca de senha e "sair de todos" valem **na hora em todas as réplicas** (a revogação vai para o Redis). Sem Redis, vale na hora só na instância que revogou e em até `SESSAO_CACHE_SEGUNDOS` (5 s) nas demais.
 - **Cache de renovação do BFF** é por processo (só uma otimização: a tolerância do backend cobre as corridas entre réplicas).
 - **Rate limit** é em memória por padrão; com `RATE_LIMIT_STORE=redis` é compartilhado, mas o Redis passa a ser uma peça a operar (sem persistência: reiniciá-lo zera os contadores).
 - **Bloqueio de conta** permite que terceiros travem temporariamente uma conta alheia (contrapartida conhecida dessa defesa).
 - **CSP**: scripts e elementos `<style>` usam nonce, mas atributos `style=""` seguem liberados (`style-src-attr 'unsafe-inline'`) porque as animações os geram; não executam código.
-- O cadastro revela se um e-mail já existe (`422`); mitigado pelo rate limit.
-- **Pool de ONGs** (distribuir vagas em lote entre várias ONGs) e relatórios de impacto (ESG) estão fora do escopo atual.
-- **Filtro de idade** na busca da empresa não existe de propósito (risco de discriminação; só o Aprendiz tem faixa legal, já aplicada). Se for requisito, valide com o jurídico antes.
-- **Avisos por e-mail** são enviados na hora, um por evento (um por busca, para sugestões); não há resumo diário nem preferências por tipo de aviso.
-- **Excluir candidato** é a anonimização (preserva o histórico das contratações sem identificar a pessoa); não há exclusão física.
-- A logo é uma recriação em SVG/texto; substitua pelo arquivo vetorial oficial quando disponível.
+- **Cadastro e e-mails existentes**: cadastrar um e-mail que já tem conta responde `201` igual ao de um cadastro novo (e avisa o dono da conta por e-mail), então não dá para listar quem usa a plataforma. Continua revelando se um **CNPJ** já está cadastrado (dado público), e o tempo de resposta é igualado (as consultas à Receita/CEP ocorrem nos dois casos).
+- **Relatórios de impacto** são totais por empresa/ONG; não há consolidado da plataforma nem exportação em CSV (use *Imprimir / salvar PDF*).
+- **Filtro de idade** está desligado por padrão e depende de aval do jurídico (veja acima).
+- **Resumo diário** roda em um único agendador por instância: com várias réplicas do backend, desligue o agendador em todas menos uma (ou use um lock) para não duplicar e-mails.
+- **Atributos `style=""` na CSP**: seguem liberados (`style-src-attr 'unsafe-inline'`). Removê-los exigiria tirar as animações geradas em HTML pelo servidor, e o ganho é pequeno (atributos de estilo não executam código).
+- **A logo** é uma recriação em SVG; substitua pelo arquivo vetorial oficial quando existir e rode `npm run icones`.

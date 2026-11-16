@@ -47,7 +47,7 @@ export default function ContaPage() {
           <PrivacidadeCard dados={dados} />
         </div>
       )}
-      {dados && dados.papel !== "ADMIN" && <NotificacoesCard ativo={dados.notificacoesEmail} onMudou={carregar} />}
+      {dados && dados.papel !== "ADMIN" && <NotificacoesCard dados={dados} onMudou={carregar} />}
       {dados?.papel === "ADMIN" && <div className="mt-4"><SegundoFator /></div>}
       {dados && (
         <Card className="mt-4 flex items-center justify-between gap-4 p-6">
@@ -62,12 +62,13 @@ export default function ContaPage() {
   );
 }
 
-function NotificacoesCard({ ativo, onMudou }: { ativo: boolean; onMudou: () => Promise<void> }) {
+function NotificacoesCard({ dados, onMudou }: { dados: ContaDados; onMudou: () => Promise<void> }) {
+  const ativo = dados.notificacoesEmail;
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState<string>();
-  async function alternar() {
+  async function alternar(campo: "ativas" | "sugestoes" | "andamento" | "resumoDiario", valor: boolean) {
     setBusy(true); setErro(undefined);
-    try { await api("conta/notificacoes", { method: "PUT", body: { ativas: !ativo } }); await onMudou(); }
+    try { await api("conta/notificacoes", { method: "PUT", body: { [campo]: valor } }); await onMudou(); }
     catch (e) { setErro(msg(e)); } finally { setBusy(false); }
   }
   return (
@@ -79,8 +80,26 @@ function NotificacoesCard({ ativo, onMudou }: { ativo: boolean; onMudou: () => P
       {erro && <div className="mb-3"><Notice>{erro}</Notice></div>}
       <div className="flex items-center justify-between gap-4 text-sm font-medium">
         <span>{ativo ? "Ligados" : "Desligados"}</span>
-        <Switch label="Avisos por e-mail" checked={ativo} disabled={busy} onChange={alternar} />
+        <Switch label="Avisos por e-mail" checked={ativo} disabled={busy} onChange={(v) => alternar("ativas", v)} />
       </div>
+      {ativo && (
+        <div className="mt-4 space-y-3 border-t border-navy/5 pt-4 text-sm">
+          {dados.papel === "ONG" && (
+            <div className="flex items-center justify-between gap-4">
+              <span>Novas sugestões de candidatos</span>
+              <Switch label="Novas sugestões" checked={dados.notifSugestoes} disabled={busy} onChange={(v) => alternar("sugestoes", v)} />
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4">
+            <span>{dados.papel === "ONG" ? "Entrevistas e contratações" : "Candidatos enviados pelas ONGs"}</span>
+            <Switch label="Andamento do funil" checked={dados.notifAndamento} disabled={busy} onChange={(v) => alternar("andamento", v)} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span>Receber tudo em <b>um resumo por dia</b> (08:00), em vez de e-mails na hora</span>
+            <Switch label="Resumo diário" checked={dados.notifResumoDiario} disabled={busy} onChange={(v) => alternar("resumoDiario", v)} />
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

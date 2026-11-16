@@ -97,7 +97,13 @@ public final class Requests {
             @Size(max = 3) Set<RegimeContratacao> regimes) {
     }
 
-    public record NotificacoesRequest(boolean ativas) {
+    /** Campos omitidos (nulos) não mudam. */
+    public record NotificacoesRequest(Boolean ativas, Boolean sugestoes, Boolean andamento, Boolean resumoDiario) {
+    }
+
+    /** Criação de várias vagas iguais de uma vez (cada uma é uma vaga independente, com seu próprio funil). */
+    public record VagaLoteRequest(@Valid @NotNull VagaRequest vaga,
+                                  @Min(value = 1, message = "Mínimo de 1 vaga") @Max(value = 20, message = "Máximo de 20 vagas por lote") int quantidade) {
     }
 
     public record VagaRequest(

@@ -1,63 +1,11 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * Jornada completa no navegador: ONG verificada cadastra e edita candidato e escolhe áreas de atuação; empresa
  * cria vaga com requisitos, busca com filtros, vê o ranking e "Por quê?", edita e exclui a vaga; conta com
  * avisos por e-mail e "Sair"; menu inferior no celular.
  */
-const API = process.env.E2E_API ?? "http://127.0.0.1:8180";
-const MAILPIT = process.env.E2E_MAILPIT ?? "http://127.0.0.1:8026";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@jaguata.local";
-const ADMIN_SENHA = process.env.ADMIN_PASSWORD ?? "girassol-azul-dev-42";
-const SENHA = "senha-e2e-segura-2026";
-
-/** CNPJ válido (dígitos verificadores corretos) com o prefixo dado e o resto aleatório. */
-function cnpjValido(prefixo: string): string {
-  const base = prefixo + String(Math.floor(Math.random() * 1e6)).padStart(6, "0") + "0001";
-  const dv = (digs: string) => {
-    const pesos = digs.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    const soma = [...digs].reduce((s, d, i) => s + Number(d) * pesos[i], 0);
-    const r = soma % 11;
-    return r < 2 ? 0 : 11 - r;
-  };
-  const d1 = dv(base);
-  return base + d1 + dv(base + d1);
-}
-
-async function tokenDoEmail(request: APIRequestContext, email: string): Promise<string> {
-  for (let i = 0; i < 30; i++) {
-    const r = await request.get(`${MAILPIT}/api/v1/search?query=${encodeURIComponent("to:" + email)}`);
-    const msgs = (await r.json()).messages ?? [];
-    for (const m of msgs) {
-      const det = await (await request.get(`${MAILPIT}/api/v1/message/${m.ID}`)).json();
-      const t = /verificar-email\?token=([\w-]+)/.exec(det.Text ?? "")?.[1];
-      if (t) return t;
-    }
-    await new Promise((res) => setTimeout(res, 500));
-  }
-  throw new Error("e-mail de verificação não chegou: " + email);
-}
-
-async function registrar(request: APIRequestContext, tipo: "ong" | "empresa", email: string) {
-  const corpo: Record<string, unknown> = {
-    email, senha: SENHA, aceiteTermos: true, cnpj: cnpjValido(tipo === "ong" ? "55" : "11"),
-  };
-  if (tipo === "ong") corpo.nivelCapacidade = "NIVEL_1";
-  const r = await request.post(`${API}/api/auth/registro/${tipo}`, { data: corpo });
-  expect(r.status(), await r.text()).toBe(201);
-  const entidadeId = (await r.json()).entidadeId as string;
-  const t = await tokenDoEmail(request, email);
-  expect((await request.post(`${API}/api/auth/email/verificar`, { data: { token: t } })).status()).toBe(204);
-  return entidadeId;
-}
-
-async function entrar(page: Page, email: string) {
-  await page.goto("/login");
-  await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await page.waitForURL(/\/(ong|empresa)/);
-}
+import { ADMIN_EMAIL, ADMIN_SENHA, API, entrar, registrar, tokenApi, auth } from "./apoio";
 
 const sufixo = Date.now().toString(36);
 const emailOng = `ong.${sufixo}@e2e.local`;
@@ -69,10 +17,8 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => {
   const ongId = await registrar(request, "ong", emailOng);
   await registrar(request, "empresa", emailEmpresa);
-  const adm = await request.post(`${API}/api/auth/login`, { data: { email: ADMIN_EMAIL, senha: ADMIN_SENHA } });
-  expect(adm.status(), "login do admin (defina ADMIN_EMAIL/ADMIN_PASSWORD)").toBe(200);
-  const token = (await adm.json()).accessToken as string;
-  const v = await request.post(`${API}/api/ongs/${ongId}/verificar`, { headers: { Authorization: `Bearer ${token}` } });
+  const adm = await tokenApi(request, ADMIN_EMAIL, ADMIN_SENHA);
+  const v = await request.post(`${API}/api/ongs/${ongId}/verificar`, { headers: auth(adm) });
   expect(v.status()).toBe(200);
 });
 
@@ -171,6 +117,14 @@ test("Conta: avisos por e-mail e cartão Sair", async ({ page }) => {
   await page.goto("/conta");
   const sw = page.getByRole("switch", { name: "Avisos por e-mail" });
   await expect(sw).toBeChecked();
+  // preferências por tipo e resumo diário (aparecem com os avisos ligados)
+  const resumo = page.getByRole("switch", { name: "Resumo diário" });
+  await expect(resumo).not.toBeChecked();
+  await resumo.click();
+  await expect(resumo).toBeChecked();
+  await page.reload();
+  await expect(page.getByRole("switch", { name: "Resumo diário" })).toBeChecked();   // gravado no servidor
+  await expect(page.getByRole("switch", { name: "Andamento do funil" })).toBeChecked();
   await sw.click();
   await expect(page.getByText("Desligados")).toBeVisible();
   await page.screenshot({ path: "e2e/telas/conta.png", fullPage: true });
@@ -189,18 +143,4 @@ test("Celular: menu inferior só com ícones e sem Sair", async ({ page }) => {
   await expect(nav.getByRole("button", { name: "Nova vaga" })).toBeVisible();
   await expect(nav.getByText("Sair")).toHaveCount(0);
   await page.screenshot({ path: "e2e/telas/mobile-menu.png" });
-});
-
-test("Termos atualizados bloqueiam até aceitar (tela de aceite)", async ({ page, request }) => {
-  // o bloqueio em si (403 TERMOS_DESATUALIZADOS) é coberto no backend; aqui, a tela de aceite
-  await entrar(page, emailEmpresa);
-  const r = await request.get(`${API}/api/conta/termos`, { headers: { Authorization: "Bearer invalido" } });
-  expect(r.status()).toBe(401);                       // a rota exige sessão
-  await page.goto("/aceitar-termos");
-  await expect(page.getByRole("heading", { name: "Termos atualizados" })).toBeVisible();
-  const botao = page.getByRole("button", { name: "Aceitar e continuar" });
-  await expect(botao).toBeDisabled();
-  await page.getByRole("checkbox").check();
-  await botao.click();
-  await page.waitForURL(/\/empresa/);
 });

@@ -20,11 +20,19 @@ import java.util.UUID;
 @Component
 public class SessaoAtiva {
 
+    /** Quanto tempo a marca de revogação fica no Redis: mais que a validade de qualquer access token. */
+    private static final java.time.Duration TTL_REVOGACAO = java.time.Duration.ofHours(2);
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SessaoAtiva.class);
+
     private final SessaoRepository sessoes;
     private final Cache<UUID, Boolean> cache;
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;   // nulo com store=memory
 
-    public SessaoAtiva(SessaoRepository sessoes, SecurityProperties props) {
+    public SessaoAtiva(SessaoRepository sessoes, SecurityProperties props,
+                       org.springframework.beans.factory.ObjectProvider<org.springframework.data.redis.core.StringRedisTemplate> redisProvider) {
         this.sessoes = sessoes;
+        this.redis = "redis".equalsIgnoreCase(props.rateLimit().store()) ? redisProvider.getIfAvailable() : null;
         this.cache = Caffeine.newBuilder()
                 .maximumSize(50_000)
                 .expireAfterWrite(Duration.ofSeconds(Math.max(0, props.sessaoCacheSegundos())))
@@ -32,10 +40,34 @@ public class SessaoAtiva {
     }
 
     public boolean ativa(UUID familia) {
+        // revogações ficam no Redis, compartilhadas: valem na hora em TODAS as réplicas (o cache local só guarda "ativa")
+        if (redis != null) {
+            try {
+                if (Boolean.TRUE.equals(redis.hasKey(chave(familia)))) return false;
+            } catch (RuntimeException e) {
+                log.warn("Redis indisponível na checagem de sessão revogada: {}", e.getMessage());
+            }
+        }
         return cache.get(familia, f -> sessoes.existsByFamiliaAndRevogadaEmIsNullAndExpiraEmAfter(f, OffsetDateTime.now()));
     }
 
     public void invalidarTodas() {
         cache.invalidateAll();
+    }
+
+    /** Marca sessões como revogadas para as demais réplicas (no-op sem Redis). */
+    public void revogar(java.util.Collection<UUID> familias) {
+        if (redis == null) return;
+        for (UUID f : familias) {
+            try {
+                redis.opsForValue().set(chave(f), "1", TTL_REVOGACAO);
+            } catch (RuntimeException e) {
+                log.warn("Redis indisponível ao registrar sessão revogada: {}", e.getMessage());
+            }
+        }
+    }
+
+    private static String chave(UUID familia) {
+        return "sessao-revogada:" + familia;
     }
 }

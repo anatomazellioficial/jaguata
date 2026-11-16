@@ -17,6 +17,7 @@ import com.jaguata.plataforma.integracao.Localizacao;
 import com.jaguata.plataforma.service.CandidatoService;
 import com.jaguata.plataforma.service.CandidatoService.CadastrarCandidatoCommand;
 import com.jaguata.plataforma.service.CandidatoService.TagInput;
+import com.jaguata.plataforma.service.ImpactoService;
 import com.jaguata.plataforma.service.MatchService;
 import com.jaguata.plataforma.service.OngService;
 import jakarta.validation.Valid;
@@ -40,7 +41,11 @@ public class OngController {
     private final MatchService matches;
     private final ConsultaService consulta;
 
-    public OngController(OngService ongs, CandidatoService candidatos, MatchService matches, ConsultaService consulta) {
+    private final ImpactoService impacto;
+
+    public OngController(OngService ongs, CandidatoService candidatos, MatchService matches, ConsultaService consulta,
+                         ImpactoService impacto) {
+        this.impacto = impacto;
         this.ongs = ongs;
         this.candidatos = candidatos;
         this.matches = matches;
@@ -101,12 +106,24 @@ public class OngController {
         return candidatos.exportar(id, candidatoId);
     }
 
-    /** Direito de eliminação: anonimiza os dados pessoais do candidato (registra auditoria). */
+    /**
+     * Direito de eliminação. Por padrão ANONIMIZA (apaga os dados pessoais e preserva o histórico das contratações);
+     * com {@code definitivo=true} apaga tudo, mas só se a pessoa nunca foi contratada. Ambos registram auditoria.
+     */
     @DeleteMapping("/{id}/candidatos/{candidatoId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@acesso.ong(#id)")
-    public void anonimizarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId) {
-        candidatos.anonimizar(id, candidatoId);
+    public void anonimizarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId,
+                                    @RequestParam(defaultValue = "false") boolean definitivo) {
+        if (definitivo) candidatos.excluirDefinitivamente(id, candidatoId);
+        else candidatos.anonimizar(id, candidatoId);
+    }
+
+    /** Relatório de impacto da ONG (só totais; sem recortes por atributos de candidatos). */
+    @GetMapping("/{id}/impacto")
+    @PreAuthorize("@acesso.ong(#id)")
+    public ImpactoService.OngImpacto impacto(@PathVariable UUID id) {
+        return impacto.daOng(id);
     }
 
     /** Setores em que a ONG atua (cruzados com o setor da empresa no match). */

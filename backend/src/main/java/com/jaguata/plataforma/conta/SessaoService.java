@@ -69,6 +69,7 @@ public class SessaoService {
             // token já usado/revogado sendo apresentado de novo: possível roubo → derruba a família toda
             log.warn("Reuso de refresh token detectado; família revogada.");
             sessoes.revogarFamilia(atual.getFamilia(), agora);
+            ativas.revogar(java.util.List.of(atual.getFamilia()));
             ativas.invalidarTodas();
             throw new SessaoInvalidaException();
         }
@@ -94,14 +95,19 @@ public class SessaoService {
     public void encerrar(String bruto) {
         if (bruto == null || bruto.isBlank() || bruto.length() > 128) return;
         sessoes.findByTokenHash(Hashes.sha256(bruto))
-                .ifPresent(s -> sessoes.revogarFamilia(s.getFamilia(), OffsetDateTime.now()));
+                .ifPresent(s -> {
+                    sessoes.revogarFamilia(s.getFamilia(), OffsetDateTime.now());
+                    ativas.revogar(java.util.List.of(s.getFamilia()));
+                });
         ativas.invalidarTodas();
     }
 
     /** Troca de senha, exclusão da conta ou "sair de todos os dispositivos". */
     @Transactional
     public void encerrarTodas(UUID usuarioId) {
+        java.util.List<UUID> familias = sessoes.familiasAtivas(usuarioId);   // antes de revogar
         sessoes.revogarTodas(usuarioId, OffsetDateTime.now());
+        ativas.revogar(familias);
         ativas.invalidarTodas();
     }
 

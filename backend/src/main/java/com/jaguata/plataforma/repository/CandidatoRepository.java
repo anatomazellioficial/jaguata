@@ -14,6 +14,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
 
     List<Candidato> findByOngId(UUID ongId);
 
+    long countByOngIdAndAnonimizadoEmIsNull(UUID ongId);
+
     Page<Candidato> findByOngIdAndAnonimizadoEmIsNullOrderByNomeCompletoAsc(UUID ongId, Pageable pageable);
 
     /**
@@ -46,6 +48,8 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
                AND (v.nivel_cargo <> 'ESTAGIARIO'
                     OR c.escolaridade IN ('TECNICO_INCOMPLETO', 'SUPERIOR_INCOMPLETO'))
                AND (CAST(:modelo AS text) IS NULL OR c.modelo_trabalho_pref::text = CAST(:modelo AS text))
+               AND (CAST(:nascimentoAte AS date) IS NULL OR c.data_nascimento <= CAST(:nascimentoAte AS date))
+               AND (CAST(:nascimentoDesde AS date) IS NULL OR c.data_nascimento >= CAST(:nascimentoDesde AS date))
                AND (CAST(:escolaridadeMin AS text) IS NULL
                     OR c.escolaridade >= CAST(CAST(:escolaridadeMin AS text) AS escolaridade))
                AND NOT EXISTS (SELECT 1 FROM matches m
@@ -59,5 +63,7 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
                                                    @Param("raioMetros") double raioMetros,
                                                    @Param("modelo") String modelo,
                                                    @Param("escolaridadeMin") String escolaridadeMin,
+                                                   @Param("nascimentoAte") java.time.LocalDate nascimentoAte,
+                                                   @Param("nascimentoDesde") java.time.LocalDate nascimentoDesde,
                                                    @Param("teto") int teto);
 }

@@ -84,12 +84,13 @@ public class AuthService {
     public Usuario registrarEmpresa(String email, String senha, String cnpjBruto) {
         String e = normalizar(email);
         SenhaPolicy.validar(senha, e);
-        garantirEmailLivre(e);
+        boolean emailJaTemConta = usuarios.existsByEmail(e);
         String cnpj = Documentos.cnpj(cnpjBruto);
         if (empresas.cnpjCadastrado(cnpj)) throw new RegraNegocioException("Já existe empresa cadastrada com este CNPJ.");
 
         DadosCnpj dados = consultarAtivo(cnpj);
         Localizacao loc = localizarSede(dados);
+        if (emailJaTemConta) return respostaIgnorada(e, PapelUsuario.EMPRESA);
         Usuario u = tx.execute(s -> {
             Empresa empresa = empresas.criar(dados, loc);
             Usuario novo = novo(e, senha, PapelUsuario.EMPRESA);
@@ -104,12 +105,13 @@ public class AuthService {
     public Usuario registrarOng(String email, String senha, String cnpjBruto, NivelCapacidade nivel) {
         String e = normalizar(email);
         SenhaPolicy.validar(senha, e);
-        garantirEmailLivre(e);
+        boolean emailJaTemConta = usuarios.existsByEmail(e);
         String cnpj = Documentos.cnpj(cnpjBruto);
         if (ongs.cnpjCadastrado(cnpj)) throw new RegraNegocioException("Já existe ONG cadastrada com este CNPJ.");
 
         DadosCnpj dados = consultarAtivo(cnpj);
         Localizacao loc = localizarSede(dados);
+        if (emailJaTemConta) return respostaIgnorada(e, PapelUsuario.ONG);
         Usuario u = tx.execute(s -> {
             Ong ong = ongs.criar(dados, loc, nivel);
             Usuario novo = novo(e, senha, PapelUsuario.ONG);
@@ -118,6 +120,21 @@ public class AuthService {
         });
         aposCadastro(u);
         return u;
+    }
+
+    /**
+     * E-mail que já tem conta: a resposta é IDÊNTICA à de um cadastro novo (mesmo status e formato), para o cadastro
+     * não servir para descobrir quem usa a plataforma. O dono do e-mail recebe um aviso; nada é criado. As consultas
+     * à Receita/CEP já ocorreram, o que também iguala o tempo de resposta.
+     */
+    private Usuario respostaIgnorada(String email, PapelUsuario papel) {
+        contas.avisarTentativaDeCadastro(email);
+        Usuario falso = new Usuario();
+        falso.setEmail(email);
+        falso.setPapel(papel);
+        if (papel == PapelUsuario.EMPRESA) falso.setEmpresaId(java.util.UUID.randomUUID());
+        else falso.setOngId(java.util.UUID.randomUUID());
+        return falso;
     }
 
     private void aposCadastro(Usuario u) {

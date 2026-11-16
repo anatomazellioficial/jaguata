@@ -27,3 +27,15 @@ export function useSkills() {
   }, []);
   return c ?? [];
 }
+
+let cacheRecursos: { filtroIdade: boolean } | undefined;
+
+/** Recursos que dependem da configuração da instalação (ex.: filtro de idade, desligado por padrão). */
+export function useRecursos() {
+  const [r, setR] = useState<{ filtroIdade: boolean } | undefined>(cacheRecursos);
+  useEffect(() => {
+    if (cacheRecursos) return;
+    api<{ filtroIdade: boolean }>("cardapio/recursos").then((x) => { cacheRecursos = x; setR(x); }).catch(() => undefined);
+  }, []);
+  return r;
+}

@@ -57,7 +57,7 @@ public class ContaController {
     @PutMapping("/notificacoes")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void notificacoes(@Valid @RequestBody NotificacoesRequest req, @AuthenticationPrincipal Jwt jwt) {
-        contas.notificacoes(id(jwt), req.ativas());
+        contas.notificacoes(id(jwt), req.ativas(), req.sugestoes(), req.andamento(), req.resumoDiario());
     }
 
     @PostMapping("/sessoes/encerrar")
