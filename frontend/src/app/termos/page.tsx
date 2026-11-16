@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/Legal";
 import { VERSAO_TERMOS } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Termos de Uso — Jaguatá" };
+export const metadata: Metadata = { title: "Termos de Uso", description: "Termos de Uso da plataforma Jaguatá.", alternates: { canonical: "/termos" } };
 
 export default function TermosPage() {
   return (

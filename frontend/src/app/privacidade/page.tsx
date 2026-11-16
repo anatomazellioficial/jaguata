@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/Legal";
 import { VERSAO_TERMOS } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Política de Privacidade — Jaguatá" };
+export const metadata: Metadata = { title: "Política de Privacidade", description: "Como a Jaguatá trata dados pessoais, em conformidade com a LGPD.", alternates: { canonical: "/privacidade" } };
 
 export default function PrivacidadePage() {
   return (

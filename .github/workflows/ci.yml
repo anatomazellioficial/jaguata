@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# um push novo cancela a execução anterior da mesma branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------------------------------------
+  # Backend: testes unitários e de integração (Testcontainers sobe PostGIS e Redis reais; o runner já tem Docker)
+  backend:
+    name: Backend (Maven)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Testes
+        run: mvn -B -ntp verify
+      - name: Relatórios de teste (em caso de falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire
+          path: backend/target/surefire-reports
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Frontend: tipos, testes unitários, build de produção e auditoria das dependências de produção
+  frontend:
+    name: Frontend (tipos, Vitest, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Tipos (tsc)
+        run: npm run typecheck
+      - name: Testes unitários (Vitest)
+        run: npm test
+      - name: Build de produção
+        run: npm run build
+      - name: Auditoria das dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Ponta a ponta: stack real (docker compose) + APIs públicas simuladas + Playwright (Chromium)
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_BASE: http://localhost:3000
+      E2E_API: http://127.0.0.1:8080
+      E2E_MAILPIT: http://127.0.0.1:8025
+      # o dublê da BrasilAPI roda no host; o backend (container) o alcança por host.docker.internal
+      BRASILAPI_URL: http://host.docker.internal:4010
+      NOMINATIM_URL: http://host.docker.internal:4010
+      # muitos cadastros/logins seguidos do mesmo IP: limites folgados só neste ambiente de teste
+      RATE_LIMIT_REGISTRO_PER_HOUR: "10000"
+      RATE_LIMIT_LOGIN_PER_MINUTE: "10000"
+      RATE_LIMIT_CONSULTA_PER_MINUTE: "10000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dependências e navegador
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Segredos efêmeros (só desta execução)
+        run: |
+          echo "JWT_SECRET=$(openssl rand -base64 48)" >> "$GITHUB_ENV"
+          echo "ADMIN_EMAIL=admin@ci.local" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=ci-$(openssl rand -hex 12)" >> "$GITHUB_ENV"
+      - name: Dublê das APIs públicas (BrasilAPI)
+        working-directory: frontend
+        run: nohup node e2e/mock-apis.mjs > /tmp/mock.log 2>&1 &
+      - name: Sobe a stack
+        run: docker compose up --build -d
+      - name: Aguarda a stack ficar pronta
+        run: |
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/consulta/cep/13015904 || true)
+            web=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login || true)
+            if [ "$code" = "200" ] && [ "$web" = "200" ]; then echo "pronta após ${i}x"; exit 0; fi
+            sleep 3
+          done
+          echo "a stack não ficou pronta"; docker compose logs --tail=80; exit 1
+      - name: Testes ponta a ponta
+        working-directory: frontend
+        run: npm run e2e
+      - name: Logs da stack (em caso de falha)
+        if: failure()
+        run: docker compose logs --tail=200
+      - name: Capturas e relatório (em caso de falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-resultados
+          path: frontend/e2e/resultados
+          retention-days: 7
+      - name: Derruba a stack
+        if: always()
+        run: docker compose down -v
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Resultado único: use ESTE job como verificação obrigatória na proteção de branch
+  ci-ok:
+    name: CI ok
+    if: always()
+    needs: [backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todos os jobs passaram?
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then exit 1; fi

@@ -1,5 +1,8 @@
 # Jaguatá
 
+[![CI](https://github.com/anatomazellioficial/jaguata/actions/workflows/ci.yml/badge.svg)](https://github.com/anatomazellioficial/jaguata/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/anatomazellioficial/jaguata/actions/workflows/codeql.yml/badge.svg)](https://github.com/anatomazellioficial/jaguata/actions/workflows/codeql.yml)
+
 Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs** do terceiro setor. A ONG funciona como a "máquina de SDR" do RH da empresa: pré-qualifica, **chancela** e envia talentos em vulnerabilidade social (todos **maiores de 18 anos**) para as vagas cadastradas. Alinhada ao ODS 8 (trabalho decente).
 
 ## Sumário
@@ -13,6 +16,8 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 - [Contas e LGPD](#contas-e-lgpd)
 - [API](#api)
 - [Testes](#testes)
+- [Integração contínua (CI)](#integração-contínua-ci)
+- [SEO, metadados e ícones](#seo-metadados-e-ícones)
 - [Segurança](#segurança)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Limitações conhecidas e próximos passos](#limitações-conhecidas-e-próximos-passos)
@@ -113,6 +118,7 @@ BACKEND_URL=http://localhost:8080 npm run dev
 | `INTEGRACOES_CONNECT_TIMEOUT_MS` / `INTEGRACOES_READ_TIMEOUT_MS` | `3000` / `6000` | Timeouts das consultas externas. |
 | `CNPJ_CACHE_HOURS` / `CEP_CACHE_DAYS` | `24` / `30` | Validade do cache das consultas. |
 | `RATE_LIMIT_TRUSTED_PROXY_HOPS` | `0` | Nº de proxies confiáveis à frente (veja [Segurança](#segurança)). |
+| `SITE_URL` (frontend) | `http://localhost:3000` | Endereço público do site (canonical, sitemap, Open Graph). |
 | `LOGIN_MAX_FAILURES` / `LOGIN_LOCK_MINUTES` | `5` / `15` | Bloqueio da conta após falhas seguidas de login. |
 | `MAX_BODY_BYTES` | `65536` | Tamanho máximo do corpo das requisições. |
 | `RATE_LIMIT_STORE` | `memory` | `memory` (por instância) ou `redis` (limites e bloqueio de login **compartilhados** entre réplicas). |
@@ -241,7 +247,7 @@ Códigos relevantes: `400` dados inválidos (inclui CNPJ com dígito verificador
 ```bash
 cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS real)
 cd frontend && npm run typecheck
-cd frontend && npm test       # Vitest: utilitários, CSP/guarda de rotas (proxy), componentes e fluxo de login com 2FA
+cd frontend && npm test       # Vitest (19): utilitários, CSP/guarda de rotas (proxy), SEO, componentes e login com 2FA
 cd frontend && npm run e2e    # Playwright: jornada completa no navegador (veja abaixo)
 ```
 
@@ -261,6 +267,28 @@ npm run e2e                                  # E2E_BASE / E2E_API / E2E_MAILPIT 
 Capturas das telas ficam em `frontend/e2e/telas/` (fora do Git).
 
 A suíte do backend (138 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **endurecimento** (revogação imediata do access token, 2FA TOTP com vetores da RFC 6238, anti-replay, tolerância de refresh simultâneo, rate limit em Redis real compartilhado entre instâncias) **recursos** (aceite de Termos, avisos por e-mail sem dados pessoais, edição e exclusão de vaga e candidato, padronização de habilidades) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+
+## Integração contínua (CI)
+
+`.github/workflows/ci.yml` roda em todo *push* na `main`, em *pull requests* e sob demanda (um push novo cancela a execução anterior da mesma branch):
+
+| Job | O que faz |
+|---|---|
+| **Backend (Maven)** | `mvn verify` com Testcontainers (PostGIS e Redis reais; o runner já traz Docker). Em falha, publica os relatórios do Surefire |
+| **Frontend** | `tsc`, Vitest, `next build` e `npm audit --omit=dev --audit-level=high` |
+| **E2E (Playwright)** | Gera segredos efêmeros, sobe o dublê da BrasilAPI e a stack via `docker compose up --build`, espera ficar pronta e roda a jornada no Chromium. Em falha, publica logs da stack, capturas e traços |
+| **CI ok** | Resume os três: use **este** job como verificação obrigatória na proteção de branch |
+
+Outros arquivos: `codeql.yml` (CodeQL `security-extended` para Java e TypeScript, em push/PR e toda segunda) e `dependabot.yml` (Maven, npm, Actions e Docker, semanal, com atualizações menores agrupadas).
+
+Para exigir o CI antes de integrar: *Settings → Branches → Branch protection rule* na `main`, marcando **Require status checks to pass** com o job `CI ok`. Os segredos do E2E são gerados na hora (`openssl rand`), então não há nenhum *secret* a cadastrar.
+
+## SEO, metadados e ícones
+
+- **Metadados** (`src/app/layout.tsx`): título com *template* (`Página · Jaguatá`), descrição, palavras-chave, canonical, Open Graph e Twitter Card, `theme-color`, idioma `pt-BR` e dados estruturados *schema.org* (Organization e WebSite em JSON-LD). Cada rota tem o seu título/descrição em `layout.tsx` próprio.
+- **Indexação**: só a página inicial, cadastro, login, Termos e Privacidade são indexáveis. Áreas logadas e telas de fluxo (verificação de e-mail, redefinição de senha, aceite de termos) saem com `noindex, nofollow` e também em `robots.txt`; `/sitemap.xml` lista apenas as públicas.
+- **Endereço público**: defina `SITE_URL` (ex.: `https://jaguata.org.br`) no frontend; ele alimenta canonical, sitemap, Open Graph e JSON-LD. Sem ele, usa `http://localhost:3000`.
+- **Ícones do "J"**: `favicon.ico` (16/32/48), `icon.svg`, `apple-icon.png`, ícones do manifesto web (192/512 e *maskable*) e a imagem de compartilhamento 1200×630 (com a fonte Lexend). Tudo é gerado do mesmo desenho da logo por `npm run icones` (`frontend/scripts/gerar-icones.mjs`) e os arquivos ficam versionados; rode de novo só se a logo mudar.
 
 ## Segurança
 

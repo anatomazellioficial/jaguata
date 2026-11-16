@@ -45,6 +45,8 @@ services:
 
   backend:
     build: ./backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # permite apontar BRASILAPI_URL para um dublê no host (E2E/CI)
     depends_on:
       db:
         condition: service_healthy
@@ -96,6 +98,7 @@ services:
       - backend
     environment:
       BACKEND_URL: http://backend:8080
+      SITE_URL: ${SITE_URL:-http://localhost:3000}   # endereço público (canonical, sitemap, Open Graph); em produção, o domínio real
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     read_only: true
