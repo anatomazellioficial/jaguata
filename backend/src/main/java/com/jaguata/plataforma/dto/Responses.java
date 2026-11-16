@@ -43,20 +43,37 @@ public final class Responses {
     /** Visão da EMPRESA: mostra o cargo escolhido e o título que a ONG enxergará. */
     public record VagaResponse(UUID id, UUID empresaId, NivelCargo nivelCargo, String tituloExibicao,
                                TipoContrato tipoContrato, ModeloTrabalho modeloTrabalho,
-                               String cepAtuacao, StatusVaga status) {
+                               String cepAtuacao, StatusVaga status,
+                               Escolaridade escolaridadeMinima, RegimeContratacao regime, List<String> skills,
+                               List<GrupoPrioritario> gruposPrioritarios, String justificativaAfirmativa) {
         public static VagaResponse from(Vaga v) {
             return new VagaResponse(v.getId(), v.getEmpresa().getId(), v.getNivelCargo(), v.getTituloExibicao(),
-                    v.getTipoContrato(), v.getModeloTrabalho(), v.getCepAtuacao(), v.getStatus());
+                    v.getTipoContrato(), v.getModeloTrabalho(), v.getCepAtuacao(), v.getStatus(),
+                    v.getEscolaridadeMinima(), v.getRegime(), List.copyOf(v.getSkills()),
+                    List.copyOf(v.getGruposPrioritarios()), v.getJustificativaAfirmativa());
         }
     }
 
     /** Visão da ONG: apenas o título já traduzido pela Matriz de Complexidade. */
+    /** @param motivos por que o candidato pontuou assim (sem gênero, raça/cor, tags ou nome de grupo). */
     public record MatchResponse(UUID id, UUID vagaId, String tituloVaga, UUID candidatoId,
-                                String candidatoNome, UUID ongId, BigDecimal matchScore, StatusMatch status) {
+                                String candidatoNome, UUID ongId, BigDecimal matchScore, StatusMatch status,
+                                List<com.jaguata.plataforma.service.Motivo> motivos) {
+        private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
         public static MatchResponse from(Match m) {
             return new MatchResponse(m.getId(), m.getVaga().getId(), m.getVaga().getTituloExibicao(),
                     m.getCandidato().getId(), m.getCandidato().getNomeCompleto(), m.getOng().getId(),
-                    m.getMatchScore(), m.getStatus());
+                    m.getMatchScore(), m.getStatus(), motivos(m.getScoreDetalhe()));
+        }
+
+        private static List<com.jaguata.plataforma.service.Motivo> motivos(String json) {
+            if (json == null || json.isBlank()) return List.of();
+            try {
+                return JSON.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            } catch (Exception e) {
+                return List.of();   // detalhe ilegível não pode derrubar a listagem
+            }
         }
     }
 
@@ -122,17 +139,20 @@ public final class Responses {
     /** Item da lista de candidatos da ONG (sem dados de localização exata). */
     public record CandidatoResumoResponse(UUID id, String nomeCompleto, int idade, ModeloTrabalho modeloTrabalhoPref,
                                           List<TagResponse> tags, java.time.OffsetDateTime cadastradoEm,
-                                          String consentimentoVersao) {
+                                          String consentimentoVersao, Escolaridade escolaridade,
+                                          List<RegimeContratacao> regimes) {
         public static CandidatoResumoResponse from(Candidato c) {
             return new CandidatoResumoResponse(c.getId(), c.getNomeCompleto(), c.getIdade(), c.getModeloTrabalhoPref(),
                     c.getTags().stream().map(t -> new TagResponse(t.getCategoria(), t.getTag())).toList(),
-                    c.getCreatedAt(), c.getConsentimentoVersao());
+                    c.getCreatedAt(), c.getConsentimentoVersao(), c.getEscolaridade(), List.copyOf(c.getRegimes()));
         }
     }
 
     /** Exportação completa dos dados de um candidato (LGPD, art. 18, II e V). */
     public record CandidatoExportacaoResponse(UUID id, UUID ongId, String nomeCompleto, java.time.LocalDate dataNascimento,
                                               String cep, double lat, double lng, ModeloTrabalho modeloTrabalhoPref,
+                                              Escolaridade escolaridade, Genero genero, RacaCor racaCor,
+                                              List<RegimeContratacao> regimes,
                                               List<TagResponse> tags, java.time.OffsetDateTime cadastradoEm,
                                               java.time.OffsetDateTime consentimentoEm, String consentimentoVersao,
                                               List<ParticipacaoResponse> participacoes) {

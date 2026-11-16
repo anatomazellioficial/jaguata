@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
-import { Avatar, Button, Card, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, StatusBadge, spring } from "@/components/ui";
+import { Avatar, Button, Card, ChipGroup, Field, Notice, ScoreRing, Segmented, Select, Sheet, Skeleton, StatusBadge, spring } from "@/components/ui";
+import { useCatalogo } from "@/lib/catalogo";
 import Link from "next/link";
 import { ApiError, api, baixar, getSession } from "@/lib/api";
 import {
@@ -26,7 +27,7 @@ export default function OngPage() {
   const [erro, setErro] = useState<string>();
   const [sheet, setSheet] = useState(false);
   const [cadastrados, setCadastrados] = useState(0);
-  const [secao, setSecao] = useState<"funil" | "candidatos">("funil");
+  const [secao, setSecao] = useState<"funil" | "candidatos" | "areas">("funil");
 
   useEffect(() => {
     getSession()
@@ -39,16 +40,18 @@ export default function OngPage() {
       title="Sua ONG"
       subtitle="Cadastre seus assistidos (18+) e envie os melhores perfis para as vagas sugeridas."
       action={ongId ? <Button size="sm" onClick={() => setSheet(true)}>＋ Novo candidato</Button> : undefined}
+      mobileAction={ongId ? { label: "Novo candidato", onClick: () => setSheet(true) } : undefined}
     >
       {erro && <Notice>{erro}</Notice>}
       {ongId && (
         <div className="mb-8">
           <Segmented label="Seção" value={secao} onChange={setSecao}
-            options={[{ value: "funil", label: "Funil" }, { value: "candidatos", label: "Meus candidatos" }]} />
+            options={[{ value: "funil", label: "Funil" }, { value: "candidatos", label: "Meus candidatos" }, { value: "areas", label: "Áreas de atuação" }]} />
         </div>
       )}
       {ongId && secao === "funil" && <Fila ongId={ongId} novoCadastro={cadastrados} />}
       {ongId && secao === "candidatos" && <ListaCandidatos ongId={ongId} atualizar={cadastrados} />}
+      {ongId && secao === "areas" && <Areas ongId={ongId} />}
       {ongId && (
         <Sheet open={sheet} onClose={() => setSheet(false)} title="Novo candidato">
           <NovoCandidato ongId={ongId} onCadastrado={() => setCadastrados((n) => n + 1)} onFechar={() => setSheet(false)} />
@@ -126,12 +129,48 @@ function Fila({ ongId, novoCadastro }: { ongId: string; novoCadastro: number }) 
   );
 }
 
+function Areas({ ongId }: { ongId: string }) {
+  const cat = useCatalogo();
+  const [sel, setSel] = useState<string[]>();
+  const [erro, setErro] = useState<string>();
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<string[]>(`ongs/${ongId}/setores`).then(setSel).catch((e) => setErro(msg(e)));
+  }, [ongId]);
+
+  async function salvar() {
+    setBusy(true); setErro(undefined); setOk(false);
+    try { setSel(await api<string[]>(`ongs/${ongId}/setores`, { method: "PUT", body: { setores: sel } })); setOk(true); }
+    catch (e) { setErro(msg(e)); } finally { setBusy(false); }
+  }
+
+  return (
+    <section className="max-w-2xl">
+      <h2 className="title text-3xl">Áreas de atuação</h2>
+      <p className="mt-2 text-mute">Em quais setores a sua ONG tem parceria ou tradição de encaminhar pessoas? Isso pesa no ranking
+        das vagas das empresas desses setores (15 dos 100 pontos).</p>
+      {sel && sel.length === 0 && <div className="mt-4"><Notice kind="info">Você ainda não escolheu áreas: todas as empresas recebem pontuação neutra neste critério.</Notice></div>}
+      <div className="mt-6">
+        {!sel || !cat ? <Skeleton className="h-32" /> : (
+          <ChipGroup label="Setores" options={cat.setores} value={sel} onChange={(v) => { setSel(v); setOk(false); }} max={15} />
+        )}
+      </div>
+      {erro && <div className="mt-4"><Notice>{erro}</Notice></div>}
+      {ok && <div className="mt-4"><Notice kind="ok">Áreas salvas.</Notice></div>}
+      <Button className="mt-6" onClick={salvar} loading={busy} disabled={!sel}>Salvar áreas</Button>
+    </section>
+  );
+}
+
 function ListaCandidatos({ ongId, atualizar }: { ongId: string; atualizar: number }) {
   const [pagina, setPagina] = useState(0);
   const [dados, setDados] = useState<Pagina<CandidatoResumo>>();
   const [erro, setErro] = useState<string>();
   const [confirmar, setConfirmar] = useState<string>();
   const [busy, setBusy] = useState<string>();
+  const cat = useCatalogo();
   const TAM = 10;
 
   const carregar = useCallback(async () => {
@@ -176,7 +215,9 @@ function ListaCandidatos({ ongId, atualizar }: { ongId: string; atualizar: numbe
               <Avatar name={c.nomeCompleto} size={48} />
               <div className="min-w-[10rem] flex-1">
                 <p className="truncate text-lg font-semibold tracking-tight">{c.nomeCompleto}</p>
-                <p className="text-sm text-mute">{c.idade} anos · {ROTULO_MODELO[c.modeloTrabalhoPref]}</p>
+                <p className="text-sm text-mute">{c.idade} anos · {ROTULO_MODELO[c.modeloTrabalhoPref]}
+                  {c.escolaridade ? ` · ${cat?.escolaridades.find((o) => o.codigo === c.escolaridade)?.rotulo ?? c.escolaridade}` : ""}
+                  {c.regimes?.length ? ` · ${c.regimes.join("/")}` : ""}</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {c.tags.map((t) => <span key={t.categoria + t.tag} className="rounded-full bg-sun/50 px-2.5 py-0.5 text-xs font-semibold">{t.tag}</span>)}
                 </div>
@@ -211,7 +252,10 @@ function ListaCandidatos({ ongId, atualizar }: { ongId: string; atualizar: numbe
 function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCadastrado: () => void; onFechar: () => void }) {
   const [f, setF] = useState({
     nomeCompleto: "", dataNascimento: "", cep: "", modeloTrabalhoPref: "PRESENCIAL" as ModeloTrabalho,
+    escolaridade: "", genero: "", racaCor: "",
   });
+  const cat = useCatalogo();
+  const [regimes, setRegimes] = useState<string[]>([]);
   const [tags, setTags] = useState<{ categoria: CategoriaTag; tag: string }[]>([]);
   const [novaTag, setNovaTag] = useState({ categoria: "VULNERABILIDADE" as CategoriaTag, tag: "" });
   const [consentimento, setConsentimento] = useState(false);
@@ -234,7 +278,10 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
     try {
       await api(`ongs/${ongId}/candidatos`, {
         method: "POST",
-        body: { ...f, cep: f.cep.replace(/\D/g, ""), tags, consentimentoConfirmado: consentimento },   // coordenadas são obtidas no servidor, pelo CEP
+        body: {
+          ...f, cep: f.cep.replace(/\D/g, ""), tags, consentimentoConfirmado: consentimento,
+          escolaridade: f.escolaridade || null, genero: f.genero || null, racaCor: f.racaCor || null, regimes,
+        },   // coordenadas são obtidas no servidor, pelo CEP
       });
       onCadastrado();
       onFechar();
@@ -255,6 +302,28 @@ function NovoCandidato({ ongId, onCadastrado, onFechar }: { ongId: string; onCad
       <Select label="Preferência de trabalho" value={f.modeloTrabalhoPref} onChange={set("modeloTrabalhoPref")}>
         {Object.entries(ROTULO_MODELO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </Select>
+
+      <Select label="Escolaridade" value={f.escolaridade} onChange={set("escolaridade")}>
+        <option value="">Não informada</option>
+        {cat?.escolaridades.map((o) => <option key={o.codigo} value={o.codigo}>{o.rotulo}</option>)}
+      </Select>
+      <ChipGroup label="Regimes de contratação aceitos" options={cat?.regimes ?? []} value={regimes} onChange={setRegimes} />
+
+      <details className="rounded-2xl bg-navy/[.04] p-4 text-sm">
+        <summary className="cursor-pointer font-semibold">Autodeclaração (opcional)</summary>
+        <p className="mt-2 text-mute">Só preencha se o(a) assistido(a) quiser. Usada apenas para dar prioridade em vagas afirmativas;
+          nunca é mostrada às empresas e é apagada na anonimização.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Select label="Gênero" value={f.genero} onChange={set("genero")}>
+            <option value="">Prefere não informar</option>
+            {cat?.generos.map((o) => <option key={o.codigo} value={o.codigo}>{o.rotulo}</option>)}
+          </Select>
+          <Select label="Raça/cor" value={f.racaCor} onChange={set("racaCor")}>
+            <option value="">Prefere não informar</option>
+            {cat?.racas.map((o) => <option key={o.codigo} value={o.codigo}>{o.rotulo}</option>)}
+          </Select>
+        </div>
+      </details>
 
       <fieldset className="space-y-3">
         <legend className="mb-1.5 text-[13px] font-medium text-mute">Tags</legend>

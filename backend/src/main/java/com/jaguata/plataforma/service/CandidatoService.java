@@ -7,7 +7,11 @@ import com.jaguata.plataforma.domain.CandidatoTag;
 import com.jaguata.plataforma.domain.Match;
 import com.jaguata.plataforma.domain.Ong;
 import com.jaguata.plataforma.domain.enums.CategoriaTag;
+import com.jaguata.plataforma.domain.enums.Escolaridade;
+import com.jaguata.plataforma.domain.enums.Genero;
 import com.jaguata.plataforma.domain.enums.ModeloTrabalho;
+import com.jaguata.plataforma.domain.enums.RacaCor;
+import com.jaguata.plataforma.domain.enums.RegimeContratacao;
 import com.jaguata.plataforma.domain.enums.StatusMatch;
 import com.jaguata.plataforma.dto.Responses.CandidatoExportacaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResumoResponse;
@@ -25,7 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -44,7 +50,11 @@ public class CandidatoService {
             double lat,
             double lng,
             ModeloTrabalho modeloTrabalhoPref,
-            List<TagInput> tags) {
+            List<TagInput> tags,
+            Escolaridade escolaridade,
+            Genero genero,
+            RacaCor racaCor,
+            Set<RegimeContratacao> regimes) {
     }
 
     private final CandidatoRepository candidatos;
@@ -83,6 +93,10 @@ public class CandidatoService {
         c.setLat(cmd.lat());
         c.setLng(cmd.lng());
         c.setModeloTrabalhoPref(cmd.modeloTrabalhoPref());
+        c.setEscolaridade(cmd.escolaridade());
+        c.setGenero(cmd.genero());          // autodeclaração opcional; nunca exibida às empresas
+        c.setRacaCor(cmd.racaCor());
+        c.setRegimes(cmd.regimes() == null ? new LinkedHashSet<>() : new LinkedHashSet<>(cmd.regimes()));
         c.setConsentimentoEm(OffsetDateTime.now());
         c.setConsentimentoVersao(Termos.VERSAO);
         c.setConsentimentoUsuarioId(usuarioQueAtesta);
@@ -114,6 +128,7 @@ public class CandidatoService {
         auditoria.registrarComoAtual("CANDIDATO_EXPORTADO", "candidato", c.getId(), null);
         return new CandidatoExportacaoResponse(c.getId(), c.getOng().getId(), c.getNomeCompleto(), c.getDataNascimento(),
                 c.getCep(), c.getLat(), c.getLng(), c.getModeloTrabalhoPref(),
+                c.getEscolaridade(), c.getGenero(), c.getRacaCor(), new java.util.ArrayList<>(c.getRegimes()),
                 c.getTags().stream().map(t -> new TagResponse(t.getCategoria(), t.getTag())).toList(),
                 c.getCreatedAt(), c.getConsentimentoEm(), c.getConsentimentoVersao(), participacoes);
     }
@@ -127,6 +142,10 @@ public class CandidatoService {
         Candidato c = daOng(ongId, candidatoId);
         c.setNomeCompleto("Candidato removido");
         c.setDataNascimento(DATA_ANONIMA);
+        c.setGenero(null);
+        c.setRacaCor(null);
+        c.setEscolaridade(null);
+        c.getRegimes().clear();
         c.setCep("00000000");
         c.setLat(0);
         c.setLng(0);

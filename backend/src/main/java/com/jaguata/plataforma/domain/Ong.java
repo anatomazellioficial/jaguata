@@ -1,6 +1,7 @@
 package com.jaguata.plataforma.domain;
 
 import com.jaguata.plataforma.domain.enums.NivelCapacidade;
+import com.jaguata.plataforma.domain.enums.SetorAtuacao;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -11,7 +12,9 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -59,6 +62,13 @@ public class Ong {
 
     @Column(name = "is_verified", nullable = false)
     private boolean verified = false;
+
+    /** Setores em que a ONG atua; cruzados com o setor (CNAE) da empresa no match. Vazio = não declarou. */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "ong_setores", joinColumns = @JoinColumn(name = "ong_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "setor", nullable = false)
+    private Set<SetorAtuacao> setores = new LinkedHashSet<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

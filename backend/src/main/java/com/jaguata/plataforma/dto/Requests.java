@@ -6,6 +6,7 @@ import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Payloads de entrada da API. Dados que vêm de fontes oficiais (razão social, CNAE, porte, endereço e
@@ -65,6 +66,11 @@ public final class Requests {
             @NotBlank @Size(max = 9) String cep,
             @NotNull ModeloTrabalho modeloTrabalhoPref,
             @Valid List<TagRequest> tags,
+            Escolaridade escolaridade,
+            /** Autodeclaração opcional; usada só em vagas afirmativas e nunca exibida às empresas. */
+            Genero genero,
+            RacaCor racaCor,
+            @Size(max = 3) Set<RegimeContratacao> regimes,
             /** A ONG atesta que o(a) assistido(a) assinou o termo de consentimento para o tratamento dos dados. */
             @AssertTrue(message = "É necessário confirmar o consentimento do(a) assistido(a).") boolean consentimentoConfirmado) {
     }
@@ -73,7 +79,16 @@ public final class Requests {
             @NotNull NivelCargo nivelCargo,
             @NotNull TipoContrato tipoContrato,
             @NotNull ModeloTrabalho modeloTrabalho,
-            @NotBlank @Size(max = 9) String cepAtuacao) {
+            @NotBlank @Size(max = 9) String cepAtuacao,
+            Escolaridade escolaridadeMinima,
+            RegimeContratacao regime,
+            @Size(max = 15, message = "No máximo 15 habilidades") List<@NotBlank @Size(max = 80) String> skills,
+            /** Vaga afirmativa: só aumenta a pontuação de quem pertence aos grupos; exige justificativa. */
+            @Size(max = 7) Set<GrupoPrioritario> gruposPrioritarios,
+            @Size(max = 500) String justificativaAfirmativa) {
+    }
+
+    public record SetoresRequest(@NotNull @Size(max = 15) Set<SetorAtuacao> setores) {
     }
 
     public record StatusVagaRequest(@NotNull StatusVaga status) {

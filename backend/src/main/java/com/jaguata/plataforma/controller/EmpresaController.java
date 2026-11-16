@@ -43,7 +43,8 @@ public class EmpresaController {
     public VagaResponse criarVaga(@PathVariable UUID id, @Valid @RequestBody VagaRequest req) {
         Localizacao loc = consulta.cep(req.cepAtuacao());   // coordenadas vêm do CEP, nunca do cliente
         return VagaResponse.from(vagas.criar(id, new CriarVagaCommand(req.nivelCargo(), req.tipoContrato(),
-                req.modeloTrabalho(), loc.cep(), loc.lat(), loc.lng())));
+                req.modeloTrabalho(), loc.cep(), loc.lat(), loc.lng(), req.escolaridadeMinima(), req.regime(),
+                req.skills(), req.gruposPrioritarios(), req.justificativaAfirmativa())));
     }
 
     @GetMapping("/{id}/vagas")

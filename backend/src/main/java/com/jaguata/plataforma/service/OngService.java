@@ -66,6 +66,22 @@ public class OngService {
                 : ongs.findByVerifiedOrderByCreatedAtDesc(verificada);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.Set<com.jaguata.plataforma.domain.enums.SetorAtuacao> setores(UUID id) {
+        Ong o = ongs.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("ONG", id));
+        return new java.util.TreeSet<>(o.getSetores());
+    }
+
+    @Transactional
+    public java.util.Set<com.jaguata.plataforma.domain.enums.SetorAtuacao> atualizarSetores(
+            UUID id, java.util.Set<com.jaguata.plataforma.domain.enums.SetorAtuacao> novos) {
+        Ong o = ongs.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("ONG", id));
+        o.getSetores().clear();
+        o.getSetores().addAll(novos);
+        auditoria.registrarComoAtual("ONG_SETORES_ATUALIZADOS", "ong", id, "total=" + novos.size());
+        return new java.util.TreeSet<>(o.getSetores());
+    }
+
     private Ong alterarVerificacao(UUID id, boolean valor) {
         Ong o = ongs.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("ONG", id));
         o.setVerified(valor);

@@ -9,6 +9,7 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 - [Como rodar](#como-rodar)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Integrações externas (Receita e CEP)](#integrações-externas-receita-e-cep)
+- [Matching e filtros](#matching-e-filtros)
 - [Contas e LGPD](#contas-e-lgpd)
 - [API](#api)
 - [Testes](#testes)
@@ -27,13 +28,13 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 | **Cardápio de cargos fechado**: Aprendiz, Estagiário, Trainee, Assistente, Analista, Coordenador, Gerente, Diretor, CEO | `enum` no banco, na API e no frontend |
 | **Matriz de Complexidade**: MEI/ME/EPP que abrem "Diretor" ou "CEO" são exibidas à ONG como *Coordenador/Gerente* | `NivelCargo.tituloExibicaoPara` |
 | **Jovem Aprendiz**: só candidatos de 18 a 24 anos | *trigger* no banco, entidade `Match` e consulta de match |
-| **Match por território, perfil e CNAE**: raio em km (PostGIS), modelo de trabalho e CNAE | `MatchService` + `MatchScoreCalculator` |
+| **Match explicável** por território, modelo, setor, formação, habilidades, regime e prioridade (vagas afirmativas) | `MatchService` + `MatchScoreCalculator` (veja [Matching e filtros](#matching-e-filtros)) |
+| **Estágio**: só candidatos com curso técnico ou superior **em andamento** | consulta, *trigger* no banco e entidade `Match` |
 | **Funil**: Sugerido → Enviado → Entrevista → Contratado (ou Recusado) | `StatusMatch` + validação de transições |
 | **Só ONGs verificadas** entram em matches | consulta de elegíveis + painel de admin |
 | **Contratar preenche a vaga**: a vaga vira `PREENCHIDA`, as demais pendências dela (sugeridas, enviadas, em entrevista) são encerradas como recusadas e só se avança em vaga aberta | `MatchService.avancar` |
 | **Quem já foi contratado não é sugerido de novo** e não pode ser contratado duas vezes | consulta de elegíveis + `MatchService` |
 
-O *score* (0–100) combina território (50), modelo de trabalho (20) e CNAE (30). A compatibilidade de CNAE hoje é a mesma divisão (2 primeiros dígitos); está isolada em `CnaeCompatibilidade` para ser trocada por uma tabela de afinidade.
 
 ## Arquitetura
 
@@ -143,6 +144,32 @@ O cadastro **não aceita** razão social, CNAE, porte, endereço nem coordenadas
 
 **Privacidade (LGPD):** para as fontes externas só trafegam **CNPJ, CEP e nomes de rua/cidade** (dados públicos). Nenhum nome, e-mail ou dado de candidato é enviado. A resposta da Receita inclui o quadro societário (nomes de pessoas físicas): ele **nunca é lido, guardado nem exposto**. As rotas `/api/consulta/**` são públicas (o cadastro ainda não tem conta), por isso têm rate limit próprio e só devolvem dados públicos.
 
+## Matching e filtros
+
+**Elegibilidade (regras duras, nunca pontuam):** ONG verificada · candidato não anonimizado · vaga aberta · dentro do raio (vaga remota ignora a distância) · Aprendiz de 18 a 24 anos · Estagiário com técnico/superior em andamento · não sugerido antes para a vaga · não contratado.
+
+**Score v2 (0–100), com explicação por critério** (`motivos` em cada match; a empresa vê o botão *Por quê?*):
+
+| Critério | Pontos | Como pontua |
+|---|---|---|
+| Território | 30 | decai linearmente com a distância até o raio; remoto = máximo |
+| Modelo de trabalho | 10 | preferência coincide = 10; híbrido de um dos lados = 5 |
+| Setor | 15 | setor da empresa (divisão do CNAE) × áreas de atuação da ONG; ONG sem áreas = neutro (7,5) |
+| Formação | 15 | escolaridade mínima da vaga; um nível abaixo = 5; sem dado = 5; sem exigência = 15 |
+| Habilidades | 15 | proporção das habilidades desejadas que o candidato tem (sem acento/caixa) |
+| Regime | 5 | CLT / PJ / Cooperado preferido pelo candidato |
+| Prioridade | 10 | só em vagas afirmativas: quem pertence a um grupo priorizado recebe os 10 pontos; vaga comum dá 10 a todos |
+
+Critério que a vaga não exige vale o máximo. Dados antigos sem os novos campos recebem pontuação neutra, não são excluídos.
+
+**Filtros da empresa** (`POST /api/vagas/{id}/matches/sugestoes?raioKm=&limite=&modelo=&escolaridadeMin=&regime=&skills=a,b`): modelo preferido, escolaridade mínima, regime e habilidades obrigatórias. São **apenas critérios profissionais**: de propósito, não existem filtros por idade, gênero ou raça/cor.
+
+**Vagas afirmativas (opt-in):** a empresa escolhe grupos (PCD, egressos, 50+, mulheres, pessoas negras, indígenas, pessoas trans e não binárias) e **precisa justificar** (mín. 20 caracteres; a ação fica na auditoria). Os grupos só **somam pontos** no ranking; ninguém é excluído.
+
+**Privacidade das autodeclarações:** gênero e raça/cor são opcionais, declarados pelo(a) assistido(a), usados só para esse critério, **nunca expostos às empresas** (nem nos matches, nem nos motivos), exportados apenas ao próprio titular e apagados na anonimização. Limitação: como a pontuação é visível, uma empresa que cria vaga afirmativa para um único grupo poderia inferir pertencimento pela diferença de 10 pontos; os motivos não nomeiam grupos para reduzir isso.
+
+**Áreas de atuação da ONG:** `GET`/`PUT /api/ongs/{id}/setores`. Catálogos de formulários em `GET /api/cardapio/perfil`.
+
 ## Contas e LGPD
 
 ### Contas e sessões
@@ -178,7 +205,8 @@ Todas as rotas exigem `Authorization: Bearer <jwt>`, exceto `/api/auth/**`. Erro
 | `GET /api/cardapio/cargos` | autenticado | Cardápio de cargos |
 | `POST /api/empresas/{id}/vagas` · `GET …/vagas` | empresa dona | Cria e lista vagas (informa o **CEP**; coordenadas são obtidas no servidor) |
 | `GET`/`PATCH /api/vagas/{id}[/status]` | empresa dona | Consulta e altera a vaga |
-| `POST /api/vagas/{id}/matches/sugestoes?raioKm=&limite=` | empresa dona | Roda o motor de match |
+| `POST /api/vagas/{id}/matches/sugestoes?raioKm=&limite=&modelo=&escolaridadeMin=&regime=&skills=` | empresa dona | Roda o motor de match (filtros opcionais) |
+| `GET`/`PUT /api/ongs/{id}/setores` · `GET /api/cardapio/perfil` | ONG dona · autenticado | Áreas de atuação da ONG e catálogos de perfil |
 | `GET /api/vagas/{id}/matches` | empresa dona | Lista matches da vaga |
 | `POST /api/ongs/{id}/candidatos` | ONG dona | Cadastra candidato (18+) com tags (informa o **CEP**) |
 | `GET /api/ongs/{id}/matches?status=` | ONG dona | Fila/funil da ONG |
@@ -201,7 +229,7 @@ cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS re
 cd frontend && npm run typecheck
 ```
 
-A suíte do backend (105 testes) cobre: regras de negócio, migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
+A suíte do backend (120 testes) cobre: regras de negócio, **matching** (pesos do score, estágio, filtros, vagas afirmativas, privacidade das autodeclarações, áreas da ONG), migration e restrições do banco, consulta geográfica, API ponta a ponta com papéis e posse, área admin e **segurança** (rate limit, bloqueio de conta, cabeçalhos, política de senha, validação de JWT, limite de corpo) **contas e LGPD** (verificação, recuperação de senha, rotação e reuso de refresh token, consentimento, exportação, anonimização, auditoria sem dados pessoais) e **integrações** (clientes reais testados contra um servidor HTTP local que simula respostas, falhas e lentidão; nenhum teste usa a internet).
 
 ## Segurança
 

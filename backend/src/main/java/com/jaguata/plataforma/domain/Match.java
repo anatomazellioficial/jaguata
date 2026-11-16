@@ -54,6 +54,10 @@ public class Match {
     @Column(nullable = false)
     private StatusMatch status = StatusMatch.SUGERIDO;
 
+    /** JSON com os critérios e pontos do score (explicabilidade). Não contém dados sensíveis do candidato. */
+    @Column(name = "score_detalhe", columnDefinition = "text")
+    private String scoreDetalhe;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -74,6 +78,10 @@ public class Match {
     private void validarRegras() {
         if (!candidato.getOng().getId().equals(ong.getId())) {
             throw new IllegalStateException("A ONG do match deve ser a ONG dona do candidato.");
+        }
+        if (vaga.getNivelCargo() == NivelCargo.ESTAGIARIO
+                && !com.jaguata.plataforma.domain.enums.Escolaridade.ELEGIVEIS_ESTAGIO.contains(candidato.getEscolaridade())) {
+            throw new IllegalStateException("Vaga de Estagiário exige ensino técnico ou superior em andamento.");
         }
         if (vaga.getNivelCargo() == NivelCargo.APRENDIZ) {
             int idade = candidato.getIdade();

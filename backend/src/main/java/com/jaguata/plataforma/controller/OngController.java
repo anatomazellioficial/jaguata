@@ -1,7 +1,9 @@
 package com.jaguata.plataforma.controller;
 
 import com.jaguata.plataforma.domain.enums.StatusMatch;
+import com.jaguata.plataforma.domain.enums.SetorAtuacao;
 import com.jaguata.plataforma.dto.Requests.CandidatoRequest;
+import com.jaguata.plataforma.dto.Requests.SetoresRequest;
 import com.jaguata.plataforma.dto.Responses.CandidatoExportacaoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResumoResponse;
 import com.jaguata.plataforma.dto.Responses.CandidatoResponse;
@@ -23,6 +25,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** O cadastro de ONGs é feito em /api/auth/registro/ong. */
@@ -58,7 +61,8 @@ public class OngController {
         Localizacao loc = consulta.cep(req.cep());   // coordenadas vêm do CEP, nunca do cliente
         return CandidatoResponse.from(candidatos.cadastrar(id, new CadastrarCandidatoCommand(
                 req.nomeCompleto(), req.dataNascimento(), loc.cep(), loc.lat(), loc.lng(),
-                req.modeloTrabalhoPref(), tags), UUID.fromString(jwt.getSubject())));
+                req.modeloTrabalhoPref(), tags, req.escolaridade(), req.genero(), req.racaCor(), req.regimes()),
+                UUID.fromString(jwt.getSubject())));
     }
 
     /** Candidatos ativos da ONG (os anonimizados não aparecem). */
@@ -83,6 +87,19 @@ public class OngController {
     @PreAuthorize("@acesso.ong(#id)")
     public void anonimizarCandidato(@PathVariable UUID id, @PathVariable UUID candidatoId) {
         candidatos.anonimizar(id, candidatoId);
+    }
+
+    /** Setores em que a ONG atua (cruzados com o setor da empresa no match). */
+    @GetMapping("/{id}/setores")
+    @PreAuthorize("@acesso.ong(#id)")
+    public Set<SetorAtuacao> setores(@PathVariable UUID id) {
+        return ongs.setores(id);
+    }
+
+    @PutMapping("/{id}/setores")
+    @PreAuthorize("@acesso.ong(#id)")
+    public Set<SetorAtuacao> atualizarSetores(@PathVariable UUID id, @Valid @RequestBody SetoresRequest req) {
+        return ongs.atualizarSetores(id, req.setores());
     }
 
     /** Fila da ONG: por padrão, os matches SUGERIDOS aguardando envio. */

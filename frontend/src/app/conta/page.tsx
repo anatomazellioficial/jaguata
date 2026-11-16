@@ -46,6 +46,15 @@ export default function ContaPage() {
           <PrivacidadeCard dados={dados} />
         </div>
       )}
+      {dados && (
+        <Card className="mt-4 flex items-center justify-between gap-4 p-6">
+          <div>
+            <h2 className="title text-2xl">Sair</h2>
+            <p className="text-sm text-mute">Encerra a sessão neste dispositivo.</p>
+          </div>
+          <Button variant="ghost" onClick={() => logout("/login")}>Sair</Button>
+        </Card>
+      )}
     </Shell>
   );
 }

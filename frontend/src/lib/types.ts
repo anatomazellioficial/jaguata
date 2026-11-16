@@ -11,13 +11,21 @@ export type CategoriaTag = "DEMOGRAFIA" | "VULNERABILIDADE" | "SKILL";
 export interface Empresa {
   id: string; cnpj: string; razaoSocial: string; cnaePrincipal: string; porteReceita: PorteEmpresa;
 }
+export interface Opcao { codigo: string; rotulo: string }
+export interface Catalogo {
+  escolaridades: Opcao[]; regimes: Opcao[]; setores: Opcao[]; grupos: Opcao[]; generos: Opcao[]; racas: Opcao[];
+}
 export interface Vaga {
   id: string; empresaId: string; nivelCargo: NivelCargo; tituloExibicao: string;
   tipoContrato: TipoContrato; modeloTrabalho: ModeloTrabalho; cepAtuacao: string; status: StatusVaga;
+  escolaridadeMinima: string | null; regime: string | null; skills: string[];
+  gruposPrioritarios: string[]; justificativaAfirmativa: string | null;
 }
+/** Um critério do score: quanto valeu, de quanto, e uma nota curta (nunca revela atributos sensíveis). */
+export interface Motivo { criterio: string; pontos: number; maximo: number; nota: string | null }
 export interface Match {
   id: string; vagaId: string; tituloVaga: string; candidatoId: string; candidatoNome: string;
-  ongId: string; matchScore: number; status: StatusMatch;
+  ongId: string; matchScore: number; status: StatusMatch; motivos: Motivo[];
 }
 export interface AdminOng {
   id: string; cnpj: string; razaoSocial: string; cnaePrincipal: string;
@@ -56,6 +64,7 @@ export interface Pagina<T> { itens: T[]; total: number; pagina: number; tamanho:
 export interface CandidatoResumo {
   id: string; nomeCompleto: string; idade: number; modeloTrabalhoPref: ModeloTrabalho;
   tags: { categoria: CategoriaTag; tag: string }[]; cadastradoEm: string; consentimentoVersao: string | null;
+  escolaridade: string | null; regimes: string[];
 }
 export interface ContaDados {
   id: string; email: string; papel: "EMPRESA" | "ONG" | "ADMIN"; emailVerificado: boolean; criadaEm: string;
@@ -66,4 +75,8 @@ export interface Auditoria {
   id: string; quando: string; usuarioId: string | null; papel: string | null; acao: string;
   entidade: string | null; entidadeId: string | null; detalhe: string | null;
 }
+export const ROTULO_CRITERIO: Record<string, string> = {
+  TERRITORIO: "Proximidade", MODELO: "Modelo de trabalho", SETOR: "Setor x áreas da ONG", FORMACAO: "Formação",
+  SKILLS: "Habilidades", REGIME: "Regime", PRIORIDADE: "Vaga afirmativa",
+};
 export const VERSAO_TERMOS = "2026-11";

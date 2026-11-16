@@ -11,7 +11,9 @@ import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -71,6 +73,35 @@ public class Vaga {
     @JdbcType(PostgreSQLEnumJdbcType.class)
     @Column(nullable = false)
     private StatusVaga status = StatusVaga.ABERTA;
+
+    /** Formação mínima desejada (opcional). */
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "escolaridade_minima")
+    private Escolaridade escolaridadeMinima;
+
+    /** Regime de contratação (opcional: sem valor = qualquer). */
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "regime")
+    private RegimeContratacao regime;
+
+    /** Habilidades desejadas (texto livre curto, comparadas sem acento e sem diferenciar maiúsculas). */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "vaga_skills", joinColumns = @JoinColumn(name = "vaga_id"))
+    @Column(name = "skill", nullable = false, length = 80)
+    private Set<String> skills = new LinkedHashSet<>();
+
+    /** Vaga afirmativa: grupos priorizados (só aumentam a pontuação; ninguém é excluído). */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "vaga_grupos", joinColumns = @JoinColumn(name = "vaga_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "grupo", nullable = false)
+    private Set<GrupoPrioritario> gruposPrioritarios = new LinkedHashSet<>();
+
+    /** Obrigatória quando há grupos prioritários: documenta a ação afirmativa. */
+    @Column(name = "justificativa_afirmativa", length = 500)
+    private String justificativaAfirmativa;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

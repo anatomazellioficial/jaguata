@@ -296,3 +296,28 @@ export function Stat({ label, value, accent = false }: { label: string; value: n
     </motion.div>
   );
 }
+
+/** Seleção múltipla em "pílulas" (estilo iOS): usada para regimes, setores e grupos. */
+export function ChipGroup({ label, options, value, onChange, max }: {
+  label: string; options: { codigo: string; rotulo: string }[]; value: string[]; onChange: (v: string[]) => void; max?: number;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-[13px] font-medium text-mute">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const on = value.includes(o.codigo);
+          return (
+            <button key={o.codigo} type="button" aria-pressed={on}
+              disabled={!on && max !== undefined && value.length >= max}
+              onClick={() => onChange(on ? value.filter((x) => x !== o.codigo) : [...value, o.codigo])}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
+                on ? "bg-orange text-white shadow-sm" : "bg-navy/[.06] text-navy hover:bg-navy/10"}`}>
+              {o.rotulo}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}

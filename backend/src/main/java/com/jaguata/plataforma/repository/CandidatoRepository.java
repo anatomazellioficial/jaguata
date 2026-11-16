@@ -24,7 +24,10 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
      *   <li>vaga de APRENDIZ só aceita 18 a 24 anos;</li>
      *   <li>exclui candidatos que já têm match com a vaga;</li>
      *   <li>exclui candidatos que já foram CONTRATADOS (em qualquer vaga);</li>
-     *   <li>exclui candidatos anonimizados (direito de eliminação).</li>
+     *   <li>exclui candidatos anonimizados (direito de eliminação);</li>
+     *   <li>vaga de ESTAGIÁRIO só aceita quem cursa ensino técnico ou superior;</li>
+     *   <li>filtros opcionais: modelo de trabalho preferido e escolaridade mínima (os demais filtros e o score
+     *       são aplicados em Java, sobre este conjunto, que é limitado a {@code teto} candidatos).</li>
      * </ul>
      */
     @Query(nativeQuery = true, value = """
@@ -40,14 +43,21 @@ public interface CandidatoRepository extends JpaRepository<Candidato, UUID> {
                     OR ST_DWithin(c.localizacao, v.localizacao, :raioMetros))
                AND (v.nivel_cargo <> 'APRENDIZ'
                     OR c.data_nascimento > (CURRENT_DATE - INTERVAL '25 years'))
+               AND (v.nivel_cargo <> 'ESTAGIARIO'
+                    OR c.escolaridade IN ('TECNICO_INCOMPLETO', 'SUPERIOR_INCOMPLETO'))
+               AND (CAST(:modelo AS text) IS NULL OR c.modelo_trabalho_pref::text = CAST(:modelo AS text))
+               AND (CAST(:escolaridadeMin AS text) IS NULL
+                    OR c.escolaridade >= CAST(CAST(:escolaridadeMin AS text) AS escolaridade))
                AND NOT EXISTS (SELECT 1 FROM matches m
                                 WHERE m.vaga_id = v.id AND m.candidato_id = c.id)
                AND NOT EXISTS (SELECT 1 FROM matches h
                                 WHERE h.candidato_id = c.id AND h.status = 'CONTRATADO')
              ORDER BY 2
-             LIMIT :limite
+             LIMIT :teto
             """)
     List<CandidatoProximo> buscarElegiveisParaVaga(@Param("vagaId") UUID vagaId,
                                                    @Param("raioMetros") double raioMetros,
-                                                   @Param("limite") int limite);
+                                                   @Param("modelo") String modelo,
+                                                   @Param("escolaridadeMin") String escolaridadeMin,
+                                                   @Param("teto") int teto);
 }

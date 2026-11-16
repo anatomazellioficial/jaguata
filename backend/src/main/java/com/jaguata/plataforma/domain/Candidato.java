@@ -1,6 +1,10 @@
 package com.jaguata.plataforma.domain;
 
+import com.jaguata.plataforma.domain.enums.Escolaridade;
+import com.jaguata.plataforma.domain.enums.Genero;
 import com.jaguata.plataforma.domain.enums.ModeloTrabalho;
+import com.jaguata.plataforma.domain.enums.RacaCor;
+import com.jaguata.plataforma.domain.enums.RegimeContratacao;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -64,6 +68,31 @@ public class Candidato {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    /** Formação (opcional). Estágio exige TECNICO_INCOMPLETO ou SUPERIOR_INCOMPLETO. */
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "escolaridade")
+    private Escolaridade escolaridade;
+
+    /** Autodeclaração opcional. Usada só em vagas afirmativas; nunca exibida às empresas. */
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "genero")
+    private Genero genero;
+
+    /** Autodeclaração opcional (categorias do IBGE). Usada só em vagas afirmativas; nunca exibida às empresas. */
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "raca_cor")
+    private RacaCor racaCor;
+
+    /** Regimes de contratação que o candidato aceita (vazio = qualquer). */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "candidato_regimes", joinColumns = @JoinColumn(name = "candidato_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "regime", nullable = false)
+    private Set<RegimeContratacao> regimes = new LinkedHashSet<>();
 
     /** Consentimento do(a) assistido(a), atestado pela ONG no cadastro. */
     @Column(name = "consentimento_em")
