@@ -23,7 +23,7 @@ Thumbs.db
 *.iml
 
 # testes
-e2e/resultados/
-e2e/telas/
+frontend/e2e/resultados/
+frontend/e2e/telas/
 test-results/
 playwright-report/
