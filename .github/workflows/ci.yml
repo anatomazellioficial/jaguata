@@ -35,7 +35,7 @@ jobs:
         run: mvn -B -ntp verify
       - name: Relatórios de teste (em caso de falha)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-surefire
           path: backend/target/surefire-reports
@@ -123,7 +123,7 @@ jobs:
         run: docker compose logs --tail=200
       - name: Capturas e relatório (em caso de falha)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-resultados
           path: frontend/e2e/resultados
