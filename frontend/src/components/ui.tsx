@@ -6,6 +6,7 @@ import {
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
 } from "react";
 import { ROTULO_STATUS, type StatusMatch } from "@/lib/types";
+import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 
 /** Mola padrão (sensação de iOS): rápida, com pouco "quique". */
 export const spring = { type: "spring", stiffness: 380, damping: 32, mass: 0.9 } as const;
@@ -124,16 +125,14 @@ export function Notice({ kind = "error", children }: { kind?: "error" | "info" |
     info: "bg-navy/[.05] text-mute",
     ok: "bg-sun/30 text-navy",
   }[kind];
-  const icon = { error: "!", info: "i", ok: "✓" }[kind];
+  const Icone = { error: AlertCircle, info: Info, ok: CheckCircle2 }[kind];
   return (
     <motion.div
       initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={spring}
       role={kind === "error" ? "alert" : "status"}
       className={`flex items-start gap-3 rounded-2xl px-4 py-3 text-sm ${c}`}
     >
-      <span aria-hidden className="mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-current/15 text-[11px] font-bold">
-        {icon}
-      </span>
+      <Icone aria-hidden className="mt-px h-5 w-5 shrink-0" />
       <span>{children}</span>
     </motion.div>
   );
@@ -289,7 +288,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
               <h2 className="title text-2xl">{title}</h2>
               <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} aria-label="Fechar"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-navy/[.07] text-mute hover:bg-navy/[.12]">
-                ✕
+                <X className="h-4 w-4" aria-hidden />
               </motion.button>
             </div>
             <div className="overflow-y-auto px-6 pb-7 pt-2">{children}</div>

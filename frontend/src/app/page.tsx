@@ -5,6 +5,7 @@ import { m as motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { Avatar, Reveal, ScoreRing, easeOut, spring } from "@/components/ui";
+import { ArrowRight, Check } from "lucide-react";
 
 const CARGOS = ["Jovem Aprendiz", "Estagiário", "Trainee", "Assistente", "Analista", "Coordenador", "Gerente", "Diretor", "CEO"];
 
@@ -83,7 +84,7 @@ function HeroCards() {
             </div>
             <div className="mt-5 flex items-center gap-2.5 rounded-2xl bg-sun/30 px-3.5 py-2.5 text-sm font-medium">
               <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", delay: 1.2, stiffness: 300, damping: 14 }}
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-navy text-[10px] text-cream">✓</motion.span>
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-navy text-cream"><Check className="h-3 w-3" strokeWidth={3} aria-hidden /></motion.span>
               Chancelada pela ONG Futuro
             </div>
           </motion.div>
@@ -172,7 +173,7 @@ function Bento() {
           <p className="mt-2 max-w-md text-mute">Micro e pequenas empresas podem chamar o cargo de “Diretor”; a ONG enxerga o nível real da vaga.</p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <span className="rounded-2xl bg-navy/[.06] px-4 py-2.5 font-semibold">Diretor</span>
-            <motion.span animate={{ x: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }} className="text-2xl text-orange">→</motion.span>
+            <motion.span animate={{ x: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }} className="text-orange"><ArrowRight className="h-7 w-7" aria-hidden /></motion.span>
             <span className="rounded-2xl bg-orange px-4 py-2.5 font-semibold text-navy shadow-[0_8px_20px_-8px_rgba(231,139,72,.8)]">Coordenador/Gerente</span>
           </div>
         </motion.div>
@@ -183,7 +184,7 @@ function Bento() {
           <div className="flex items-center gap-4">
             <motion.span initial={{ scale: 0, rotate: -40 }} whileInView={{ scale: 1, rotate: 0 }} viewport={{ once: true }}
               transition={{ type: "spring", stiffness: 260, damping: 14 }}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-navy text-2xl text-cream">✓</motion.span>
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-navy text-cream"><Check className="h-7 w-7" strokeWidth={2.5} aria-hidden /></motion.span>
             <div>
               <h3 className="title text-2xl">Chancela da ONG</h3>
               <p className="text-sm text-mute">Só ONGs verificadas enviam candidatos.</p>
@@ -302,7 +303,7 @@ export default function Home() {
                 <ul className="mt-6 space-y-3">
                   {c.l.map((x) => (
                     <li key={x} className="flex items-center gap-3 font-medium">
-                      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${c.dark ? "bg-orange text-navy" : "bg-navy text-cream"}`}>✓</span>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full ${c.dark ? "bg-orange text-navy" : "bg-navy text-cream"}`}><Check className="h-3 w-3" strokeWidth={3} aria-hidden /></span>
                       {x}
                     </li>
                   ))}

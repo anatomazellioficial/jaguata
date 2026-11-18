@@ -46,7 +46,7 @@ test("ONG: áreas de atuação, cadastro e edição de candidato", async ({ page
   await dlg.getByLabel("Categoria da tag").selectOption("SKILL");
   await dlg.getByLabel("Tag", { exact: true }).fill("excel");
   await dlg.getByLabel("Tag", { exact: true }).press("Enter");
-  await expect(dlg.getByRole("button", { name: "excel ✕" })).toBeVisible();
+  await expect(dlg.getByRole("button", { name: "Remover excel" })).toBeVisible();
   await dlg.getByRole("checkbox").last().check();   // consentimento
   await page.screenshot({ path: "e2e/telas/ong-novo-candidato.png" });
   await dlg.getByRole("button", { name: "Cadastrar candidato" }).click();

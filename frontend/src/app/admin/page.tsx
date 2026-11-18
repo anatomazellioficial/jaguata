@@ -6,6 +6,7 @@ import { Shell } from "@/components/Shell";
 import { Avatar, Button, Card, Notice, Segmented, Select, Skeleton, Stat, spring } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { ROTULO_STATUS, type AdminOng, type Auditoria, type Pagina, type Resumo, type StatusMatch } from "@/lib/types";
+import { Check, ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 type Filtro = "pendentes" | "verificadas" | "todas";
@@ -84,7 +85,7 @@ export default function AdminPage() {
 
         {ongs && ongs.length === 0 && (
           <Card className="flex flex-col items-center px-6 py-14 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-sun/50 text-2xl">🎉</div>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-sun/50"><PartyPopper className="h-7 w-7" aria-hidden /></div>
             <p className="text-mute">{filtro === "pendentes" ? "Nenhuma ONG aguardando verificação." : "Nenhuma ONG nesta lista."}</p>
           </Card>
         )}
@@ -103,8 +104,8 @@ export default function AdminPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${o.verified ? "bg-navy text-cream" : "bg-sun/50"}`}>
-                    {o.verified ? "✓ Verificada" : "Pendente"}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${o.verified ? "bg-navy text-cream" : "bg-sun/50"}`}>
+                    {o.verified ? <><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Verificada</> : "Pendente"}
                   </span>
                   {!o.verified && <Button size="sm" loading={busyId === o.id} onClick={() => alterar(o.id, "verificar")}>Verificar</Button>}
                   <AnimatePresence mode="wait" initial={false}>
@@ -188,9 +189,9 @@ function AuditoriaSecao() {
       )}
       {dados && paginas > 1 && (
         <div className="mt-5 flex items-center justify-center gap-3">
-          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>← Anterior</Button>
+          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}><ChevronLeft className="h-4 w-4" aria-hidden /> Anterior</Button>
           <span className="text-sm text-mute">Página {pagina + 1} de {paginas}</span>
-          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima →</Button>
+          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima <ChevronRight className="h-4 w-4" aria-hidden /></Button>
         </div>
       )}
     </section>

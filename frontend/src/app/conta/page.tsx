@@ -9,6 +9,7 @@ import { SegundoFator } from "@/components/SegundoFator";
 import { ApiError, api, baixar, logout } from "@/lib/api";
 import { homeFor } from "@/lib/jwt";
 import type { ContaDados } from "@/lib/types";
+import { ArrowLeft, Check } from "lucide-react";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 const data = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -33,7 +34,7 @@ export default function ContaPage() {
     <Shell
       title="Sua conta"
       subtitle="Seus dados de acesso, segurança e direitos de privacidade."
-      action={dados ? <Link href={homeFor(dados.papel)}><Button size="sm" variant="ghost">← Painel</Button></Link> : undefined}
+      action={dados ? <Link href={homeFor(dados.papel)}><Button size="sm" variant="ghost"><ArrowLeft className="h-4 w-4" aria-hidden /> Painel</Button></Link> : undefined}
     >
       {erro && <Notice>{erro}</Notice>}
       {!dados && !erro && <div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-64" /><Skeleton className="h-64" /></div>}
@@ -113,8 +114,8 @@ function DadosCard({ dados }: { dados: ContaDados }) {
         <Linha rotulo="E-mail" valor={dados.email} />
         <Linha rotulo="Perfil" valor={dados.papel === "ADMIN" ? "Administrador" : dados.papel === "ONG" ? "ONG" : "Empresa"} />
         {entidade && <Linha rotulo="Organização" valor={entidade.razaoSocial} />}
-        {dados.ong && <Linha rotulo="Verificação da ONG" valor={dados.ong.verified ? "✓ Verificada" : "Pendente"} />}
-        <Linha rotulo="E-mail confirmado" valor={dados.emailVerificado ? "✓ Sim" : "Não"} />
+        {dados.ong && <Linha rotulo="Verificação da ONG" valor={dados.ong.verified ? <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Verificada</span> : "Pendente"} />}
+        <Linha rotulo="E-mail confirmado" valor={dados.emailVerificado ? <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Sim</span> : "Não"} />
         <Linha rotulo="Conta criada em" valor={data(dados.criadaEm)} />
         <Linha rotulo="Termos aceitos" valor={`versão ${dados.termosVersao ?? "—"} · ${data(dados.termosAceitosEm)}`} />
         <Linha rotulo="Senha alterada em" valor={data(dados.senhaAlteradaEm)} />

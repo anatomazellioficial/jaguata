@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { proxy } from "./proxy";
 
 const jwt = (papel: string) => {
@@ -57,5 +57,25 @@ describe("guarda de áreas", () => {
   it("páginas públicas não exigem sessão", () => {
     expect(proxy(req("/login")).status).toBe(200);
     expect(proxy(req("/termos")).status).toBe(200);
+  });
+});
+
+describe("modo só demonstração (DEMO_ONLY)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("desligado por padrão: a página inicial segue normal", () => {
+    expect(proxy(req("/")).status).toBe(200);
+  });
+
+  it("ligado, tudo vai para /demo, menos o protótipo e arquivos estáticos", () => {
+    vi.stubEnv("DEMO_ONLY", "1");
+    for (const rota of ["/", "/login", "/empresa", "/admin", "/registro"]) {
+      const r = proxy(req(rota));
+      expect(r.status).toBe(307);
+      expect(new URL(r.headers.get("location")!).pathname).toBe("/demo");
+    }
+    expect(proxy(req("/demo")).status).toBe(200);
+    expect(proxy(req("/icon.svg")).status).toBe(200);
+    expect(proxy(req("/manifest.webmanifest")).status).toBe(200);
   });
 });

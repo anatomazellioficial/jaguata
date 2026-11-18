@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 import { AuthFrame } from "@/components/Shell";
 import { Button, Field, Notice } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { Check } from "lucide-react";
 
 function Redefinir() {
   const param = useSearchParams().get("token");
@@ -45,7 +46,7 @@ function Redefinir() {
       <AuthFrame title="Senha alterada" footer={<span>Todas as sessões foram encerradas por segurança.</span>}>
         <div className="space-y-5 text-center">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 14 }}
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-navy text-3xl text-cream">✓</motion.div>
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-navy text-cream"><Check className="h-8 w-8" strokeWidth={2.5} aria-hidden /></motion.div>
           <Link href="/login"><Button className="w-full !py-3.5">Entrar com a nova senha</Button></Link>
         </div>
       </AuthFrame>

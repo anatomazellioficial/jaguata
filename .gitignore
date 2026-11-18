@@ -27,3 +27,6 @@ frontend/e2e/resultados/
 frontend/e2e/telas/
 test-results/
 playwright-report/
+
+.vercel
+.env.local

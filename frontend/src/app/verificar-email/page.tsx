@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { AuthFrame } from "@/components/Shell";
 import { Button, Notice, spring } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { Check } from "lucide-react";
 
 function Verificar() {
   const token = useSearchParams().get("token");
@@ -43,7 +44,7 @@ function Verificar() {
       {estado === "ok" && (
         <div className="space-y-5 text-center">
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 14 }}
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-navy text-3xl text-cream">✓</motion.div>
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-navy text-cream"><Check className="h-8 w-8" strokeWidth={2.5} aria-hidden /></motion.div>
           <p className="text-mute">Sua conta está ativa. Agora é só entrar.</p>
           <Link href="/login"><Button className="w-full !py-3.5">Entrar</Button></Link>
         </div>

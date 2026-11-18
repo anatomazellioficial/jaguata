@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import type { ConsultaCep, ConsultaCnpj } from "@/lib/types";
 import { Field, Notice, spring } from "./ui";
+import { Check, MapPin } from "lucide-react";
 
 export type Estado = "vazio" | "carregando" | "ok" | "erro";
 
@@ -89,7 +90,7 @@ export function CepField({ label, value, onChange, error, onEstado }: {
         {estado === "ok" && dado && (
           <motion.div key="ok" initial={{ opacity: 0, y: -6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}
             transition={spring} className="flex items-start gap-3 rounded-2xl bg-sun/30 px-4 py-3 text-sm">
-            <span aria-hidden className="mt-0.5">📍</span>
+            <MapPin aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-semibold">{[dado.logradouro, dado.bairro].filter(Boolean).join(", ") || "Endereço localizado"}</p>
               <p className="text-mute">{dado.cidade}/{dado.uf}</p>
@@ -149,7 +150,7 @@ export function CnpjField({ tipo, value, onChange, error, onPodeCadastrar }: {
                 {dado.nomeFantasia && <p className="text-sm text-mute">{dado.nomeFantasia}</p>}
               </div>
               <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${dado.ativa ? "bg-navy text-cream" : "bg-brick/10 text-brick"}`}>
-                {dado.ativa ? "✓ Ativa" : dado.situacao || "Inativa"}
+                {dado.ativa ? <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Ativa</span> : dado.situacao || "Inativa"}
               </span>
             </div>
             <dl className="grid grid-cols-2 gap-px bg-navy/5 text-sm">

@@ -1,0 +1,11 @@
+backend
+.github
+docker-compose*.yml
+frontend/e2e
+frontend/scripts
+frontend/node_modules
+frontend/.next
+frontend/.env*
+frontend/Dockerfile
+frontend/playwright.config.ts
+*.tsbuildinfo

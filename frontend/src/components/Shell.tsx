@@ -3,6 +3,7 @@
 import { m as motion, useMotionValueEvent, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, Plus, UserRound } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { getSession } from "@/lib/api";
 import { homeFor } from "@/lib/jwt";
@@ -14,18 +15,6 @@ import { logout } from "@/lib/api";
  * Moldura das áreas logadas, no estilo iOS: barra de vidro que aparece ao rolar,
  * "large title" que vira título pequeno na barra, entrada suave do conteúdo.
  */
-const Icone = {
-  painel: <path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10" />,
-  conta: <><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c.6-3.6 3.4-5.5 7-5.5s6.4 1.9 7 5.5" /></>,
-  mais: <path d="M12 5v14M5 12h14" />,
-};
-function Svg({ children }: { children: ReactNode }) {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.9"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden>{children}</svg>
-  );
-}
-
 export function Shell({ title, subtitle, action, mobileAction, children }: {
   title: string; subtitle?: string; action?: ReactNode; children: ReactNode;
   /** Ação principal da página no menu do celular (só ícone). */
@@ -65,14 +54,14 @@ export function Shell({ title, subtitle, action, mobileAction, children }: {
         initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={spring}
         style={{ marginBottom: "env(safe-area-inset-bottom)" }}
         className="print:hidden glass fixed inset-x-4 bottom-3 z-40 flex items-center justify-around gap-1 rounded-full px-3 py-2 sm:hidden">
-        <Link href={home} aria-label="Painel" className={aba(pathname === home)}><Svg>{Icone.painel}</Svg></Link>
+        <Link href={home} aria-label="Painel" className={aba(pathname === home)}><Home className="h-6 w-6" strokeWidth={1.9} aria-hidden /></Link>
         {mobileAction && (
           <button type="button" aria-label={mobileAction.label} onClick={mobileAction.onClick}
             className="flex h-12 w-12 items-center justify-center rounded-full bg-orange text-white shadow-md active:scale-95">
-            <Svg>{Icone.mais}</Svg>
+            <Plus className="h-6 w-6" strokeWidth={1.9} aria-hidden />
           </button>
         )}
-        <Link href="/conta" aria-label="Minha conta" className={aba(pathname === "/conta")}><Svg>{Icone.conta}</Svg></Link>
+        <Link href="/conta" aria-label="Minha conta" className={aba(pathname === "/conta")}><UserRound className="h-6 w-6" strokeWidth={1.9} aria-hidden /></Link>
       </motion.nav>
 
       <main id="conteudo" tabIndex={-1} className="outline-none">

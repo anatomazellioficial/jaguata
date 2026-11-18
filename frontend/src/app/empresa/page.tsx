@@ -14,6 +14,7 @@ import {
   ROTULO_CONTRATO, ROTULO_CRITERIO, ROTULO_MODELO,
   type Cargo, type Empresa, type ResultadoLote, type Match, type ModeloTrabalho, type NivelCargo, type TipoContrato, type Vaga,
 } from "@/lib/types";
+import { Plus, Sparkles, X } from "lucide-react";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 
@@ -71,7 +72,7 @@ export default function EmpresaPage() {
     <Shell
       title={empresa?.razaoSocial ?? "Sua empresa"}
       subtitle="Abra vagas pelo cardápio e receba candidatos chancelados pelas ONGs."
-      action={empresaId && empresa ? <Button size="sm" onClick={abrirNova}>＋ Nova vaga</Button> : undefined}
+      action={empresaId && empresa ? <Button size="sm" onClick={abrirNova}><Plus className="h-4 w-4" aria-hidden /> Nova vaga</Button> : undefined}
       mobileAction={empresaId && empresa ? { label: "Nova vaga", onClick: abrirNova } : undefined}
     >
       {erro && <div className="mb-6"><Notice>{erro}</Notice></div>}
@@ -113,10 +114,10 @@ export default function EmpresaPage() {
       {vagas && vagas.length === 0 && (
         <Card className="flex flex-col items-center px-6 py-16 text-center">
           <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}
-            className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sun/50 text-3xl">✨</motion.div>
+            className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-sun/50"><Sparkles className="h-8 w-8" aria-hidden /></motion.div>
           <h2 className="title text-2xl">Publique a sua primeira vaga</h2>
           <p className="mt-2 max-w-sm text-mute">Escolha o cargo no cardápio e deixe o motor de match encontrar candidatos perto de você.</p>
-          <Button className="mt-6" onClick={abrirNova}>＋ Nova vaga</Button>
+          <Button className="mt-6" onClick={abrirNova}><Plus className="h-4 w-4" aria-hidden /> Nova vaga</Button>
         </Card>
       )}
 
@@ -245,13 +246,13 @@ function NovaVaga({ empresaId, empresa, cargos, vaga, onCriada }: {
             onChange={(e) => setNovaSkill(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
             className="min-w-0 flex-1 rounded-2xl bg-white/80 px-4 py-2.5 text-sm shadow-[inset_0_0_0_1px_rgba(16,46,80,.10)] outline-none focus:shadow-[inset_0_0_0_1.5px_#e78b48]" />
-          <Button type="button" variant="ghost" onClick={addSkill}>＋</Button>
+          <Button type="button" variant="ghost" onClick={addSkill} aria-label="Adicionar"><Plus className="h-4 w-4" aria-hidden /></Button>
         </div>
         <datalist id="skills-catalogo">{catalogoSkills.map((s) => <option key={s} value={s} />)}</datalist>
         <div className="flex flex-wrap gap-2">
           {skills.map((t) => (
-            <button key={t} type="button" onClick={() => setSkills((s) => s.filter((x) => x !== t))} title="Remover"
-              className="rounded-full bg-sun/50 px-3 py-1 text-xs font-semibold hover:bg-brick/10 hover:text-brick">{t} ✕</button>
+            <button key={t} type="button" onClick={() => setSkills((s) => s.filter((x) => x !== t))} title="Remover" aria-label={`Remover ${t}`}
+              className="rounded-full bg-sun/50 px-3 py-1 text-xs font-semibold hover:bg-brick/10 hover:text-brick">{t} <X className="h-3 w-3" aria-hidden /></button>
           ))}
         </div>
       </fieldset>

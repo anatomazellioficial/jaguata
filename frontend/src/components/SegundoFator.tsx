@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Field, Notice } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { Check } from "lucide-react";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 
@@ -82,7 +83,7 @@ export function SegundoFator() {
 
       {ativo === true && !desativando && (
         <div className="flex items-center justify-between gap-3">
-          <span className="rounded-full bg-sun/50 px-3 py-1 text-xs font-semibold">✓ Ativa</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-sun/50 px-3 py-1 text-xs font-semibold"><Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> Ativa</span>
           <Button variant="ghost" size="sm" onClick={() => { setDesativando(true); setOk(undefined); }}>Desativar</Button>
         </div>
       )}

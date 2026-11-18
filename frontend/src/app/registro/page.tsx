@@ -8,6 +8,7 @@ import { CnpjField } from "@/components/Lookups";
 import { AuthFrame } from "@/components/Shell";
 import { Button, Field, Notice, Segmented, Select, spring } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { MailCheck } from "lucide-react";
 
 function RegistroForm() {
   const params = useSearchParams();
@@ -63,7 +64,7 @@ function RegistroForm() {
       <AuthFrame title="Confirme seu e-mail" footer={<>Já confirmou? <Link className="font-semibold text-brick hover:underline" href="/login">Entrar</Link></>}>
         <div className="space-y-5 text-center">
           <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 240, damping: 14 }}
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sun/60 text-3xl">✉️</motion.div>
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sun/60"><MailCheck className="h-8 w-8" aria-hidden /></motion.div>
           <p className="text-mute">
             Enviamos um link para <strong className="text-navy">{concluido}</strong>. Abra-o para ativar a conta. O link vale por 24 horas.
           </p>

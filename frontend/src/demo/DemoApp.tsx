@@ -11,6 +11,7 @@ import {
   EMPRESA, EXEMPLO_CANDIDATO, EXEMPLO_VAGA, GRUPOS, ONG, PASSOS, ROTULO_ESC, SKILLS_SUGERIDAS,
   estadoInicial, sugerir, type Cand, type Estado, type MatchDemo, type Papel, type VagaDemo,
 } from "./dados";
+import { ArrowRight, Check, Inbox, Lightbulb, Lock, MapPin, Sparkles } from "lucide-react";
 
 /* ------------------------------------------------------------------ estado (tudo em memória) */
 type Acao =
@@ -117,7 +118,7 @@ export function DemoApp() {
                       className={`w-full rounded-2xl px-3 py-2 text-left transition-colors ${ativo ? "bg-sun/40" : "hover:bg-navy/[.05]"}`}>
                       <span className="flex items-center gap-2.5">
                         <span aria-hidden className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${feito ? "bg-navy text-cream" : "bg-navy/10 text-navy"}`}>
-                          {feito ? "✓" : p.n}
+                          {feito ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : p.n}
                         </span>
                         <span className="text-sm font-semibold">{p.titulo}</span>
                       </span>
@@ -129,7 +130,7 @@ export function DemoApp() {
             </ol>
             {atual ? (
               <Button className="mt-4 w-full" onClick={() => ir(atual.papel, atual.aba)}>
-                Ir para o passo {atual.n} →
+                Ir para o passo {atual.n} <ArrowRight className="h-4 w-4" aria-hidden />
               </Button>
             ) : (
               <Notice kind="ok">Fluxo completo: da ONG que cadastra à empresa que contrata, com privacidade e impacto medido.</Notice>
@@ -156,10 +157,10 @@ function Titulo({ children, sub, acao }: { children: ReactNode; sub?: string; ac
   );
 }
 function Vazio({ children }: { children: ReactNode }) {
-  return <Card className="flex flex-col items-center px-6 py-12 text-center"><span aria-hidden className="mb-3 text-3xl">📭</span><p className="max-w-sm text-mute">{children}</p></Card>;
+  return <Card className="flex flex-col items-center px-6 py-12 text-center"><Inbox aria-hidden className="mb-3 h-8 w-8 text-mute" /><p className="max-w-sm text-mute">{children}</p></Card>;
 }
 function Dica({ children }: { children: ReactNode }) {
-  return <p className="mt-3 rounded-2xl bg-navy/[.04] px-4 py-3 text-[13px] leading-snug text-mute">💡 {children}</p>;
+  return <p className="mt-3 rounded-2xl bg-navy/[.04] px-4 py-3 text-[13px] leading-snug text-mute"><Lightbulb aria-hidden className="mr-2 inline h-4 w-4 align-[-3px] text-orange" />{children}</p>;
 }
 const campo = "w-full rounded-2xl bg-white/80 px-4 py-2.5 text-sm shadow-[inset_0_0_0_1px_rgba(16,46,80,.10)] outline-none focus:shadow-[inset_0_0_0_1.5px_#e78b48]";
 
@@ -261,12 +262,12 @@ function OngCandidatos({ e, dispatch }: P) {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {c.skills.map((s) => <span key={s} className="rounded-full bg-sun/50 px-2.5 py-1 text-xs font-semibold">{s}</span>)}
-              {c.grupos.map((g) => <span key={g} title="Autodeclaração: só a ONG vê" className="rounded-full bg-navy/[.07] px-2.5 py-1 text-xs font-semibold text-mute">🔒 {g}</span>)}
+              {c.grupos.map((g) => <span key={g} title="Autodeclaração: só a ONG vê" className="inline-flex items-center gap-1 rounded-full bg-navy/[.07] px-2.5 py-1 text-xs font-semibold text-mute"><Lock aria-hidden className="h-3 w-3" /> {g}</span>)}
             </div>
           </motion.li>
         ))}
       </ul>
-      <Dica>O cadeado 🔒 marca autodeclarações opcionais (gênero, raça/cor, PCD…): só a ONG as vê; a empresa nunca recebe esses dados.</Dica>
+      <Dica>O cadeado <Lock aria-hidden className="inline h-3.5 w-3.5 align-[-2px]" /> marca autodeclarações opcionais (gênero, raça/cor, PCD…): só a ONG as vê; a empresa nunca recebe esses dados.</Dica>
       <CandSheet aberto={aberto} onClose={() => setAberto(false)} onSalvar={(c) => { dispatch({ t: "cand", c }); setAberto(false); }} />
     </section>
   );
@@ -279,7 +280,7 @@ function CandSheet({ aberto, onClose, onSalvar }: { aberto: boolean; onClose: ()
   return (
     <Sheet open={aberto} onClose={onClose} title="Cadastrar candidato">
       <form className="space-y-4" onSubmit={(ev) => { ev.preventDefault(); if (f.nome.trim()) onSalvar(f); }}>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setF({ ...EXEMPLO_CANDIDATO })}>✨ Preencher exemplo</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setF({ ...EXEMPLO_CANDIDATO })}><Sparkles className="h-4 w-4" aria-hidden /> Preencher exemplo</Button>
         <Field label="Nome completo" value={f.nome} onChange={(x) => setF({ ...f, nome: x.target.value })} required />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Idade (maior de 18)" type="number" min={18} value={f.idade} onChange={(x) => setF({ ...f, idade: Number(x.target.value) })} />
@@ -432,7 +433,7 @@ function VagaSheet({ aberto, onClose, onSalvar }: { aberto: boolean; onClose: ()
   return (
     <Sheet open={aberto} onClose={onClose} title="Publicar vaga">
       <form className="space-y-4" onSubmit={(ev) => { ev.preventDefault(); if (f.titulo.trim() && justOk) onSalvar(f); }}>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setF({ ...EXEMPLO_VAGA })}>✨ Preencher exemplo</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setF({ ...EXEMPLO_VAGA })}><Sparkles className="h-4 w-4" aria-hidden /> Preencher exemplo</Button>
         <Field label="Cargo" value={f.titulo} onChange={(x) => setF({ ...f, titulo: x.target.value })} required />
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label="Modelo de trabalho" value={f.modelo} onChange={(x) => setF({ ...f, modelo: x.target.value as ModeloTrabalho })}>
@@ -440,7 +441,7 @@ function VagaSheet({ aberto, onClose, onSalvar }: { aberto: boolean; onClose: ()
           </Select>
           <Field label="CEP de atuação" value={f.cep} placeholder="00000-000" onChange={(x) => setF({ ...f, cep: x.target.value })} />
         </div>
-        {f.cep.replace(/\D/g, "").length === 8 && <p className="rounded-2xl bg-sun/30 px-4 py-3 text-sm">📍 Campinas/SP · localização obtida pelo CEP</p>}
+        {f.cep.replace(/\D/g, "").length === 8 && <p className="rounded-2xl bg-sun/30 px-4 py-3 text-sm"><MapPin aria-hidden className="mr-1.5 inline h-4 w-4 align-[-3px]" />Campinas/SP · localização obtida pelo CEP</p>}
         <Select label="Escolaridade mínima" value={f.escolaridadeMin} onChange={(x) => setF({ ...f, escolaridadeMin: x.target.value as VagaDemo["escolaridadeMin"] })}>
           <option value="">Sem exigência</option>
           {Object.entries(ROTULO_ESC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

@@ -13,6 +13,7 @@ import {
   ROTULO_MODELO, ROTULO_STATUS,
   type CandidatoEdicao, type CandidatoResumo, type CategoriaTag, type Match, type ModeloTrabalho, type Pagina, type StatusMatch,
 } from "@/lib/types";
+import { ChevronLeft, ChevronRight, Inbox, Plus, X } from "lucide-react";
 
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado.");
 const ABAS = (Object.keys(ROTULO_STATUS) as StatusMatch[]).map((s) => ({ value: s, label: ROTULO_STATUS[s] }));
@@ -41,7 +42,7 @@ export default function OngPage() {
     <Shell
       title="Sua ONG"
       subtitle="Cadastre seus assistidos (18+) e envie os melhores perfis para as vagas sugeridas."
-      action={ongId ? <Button size="sm" onClick={() => { setEditando(undefined); setSheet(true); }}>＋ Novo candidato</Button> : undefined}
+      action={ongId ? <Button size="sm" onClick={() => { setEditando(undefined); setSheet(true); }}><Plus className="h-4 w-4" aria-hidden /> Novo candidato</Button> : undefined}
       mobileAction={ongId ? { label: "Novo candidato", onClick: () => { setEditando(undefined); setSheet(true); } } : undefined}
     >
       {erro && <Notice>{erro}</Notice>}
@@ -95,7 +96,7 @@ function Fila({ ongId, novoCadastro }: { ongId: string; novoCadastro: number }) 
       {matches && matches.length === 0 && (
         <Card className="flex flex-col items-center px-6 py-14 text-center">
           <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3.2, ease: "easeInOut" }}
-            className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-sun/50 text-2xl">📭</motion.div>
+            className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-sun/50"><Inbox className="h-7 w-7" aria-hidden /></motion.div>
           <p className="max-w-sm text-mute">
             {aba === "SUGERIDO"
               ? "Nenhuma sugestão por enquanto. Matches aparecem quando uma empresa busca candidatos e sua ONG está verificada."
@@ -216,7 +217,7 @@ function ListaCandidatos({ ongId, atualizar, onEditar }: {
       {erro && <div className="mb-4"><Notice>{erro}</Notice></div>}
       {!dados && <div className="space-y-3"><Skeleton className="h-24" /><Skeleton className="h-24" /></div>}
       {dados && dados.itens.length === 0 && (
-        <Card className="px-6 py-14 text-center"><p className="text-mute">Nenhum candidato cadastrado ainda. Use “＋ Novo candidato”.</p></Card>
+        <Card className="px-6 py-14 text-center"><p className="text-mute">Nenhum candidato cadastrado ainda. Use “Novo candidato”.</p></Card>
       )}
       <ul className="space-y-3">
         <AnimatePresence initial={false} mode="popLayout">
@@ -257,9 +258,9 @@ function ListaCandidatos({ ongId, atualizar, onEditar }: {
       </ul>
       {dados && paginas > 1 && (
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}>← Anterior</Button>
+          <Button size="sm" variant="ghost" disabled={pagina === 0} onClick={() => setPagina((p) => p - 1)}><ChevronLeft className="h-4 w-4" aria-hidden /> Anterior</Button>
           <span className="text-sm text-mute">Página {pagina + 1} de {paginas}</span>
-          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima →</Button>
+          <Button size="sm" variant="ghost" disabled={pagina + 1 >= paginas} onClick={() => setPagina((p) => p + 1)}>Próxima <ChevronRight className="h-4 w-4" aria-hidden /></Button>
         </div>
       )}
     </section>
@@ -361,7 +362,7 @@ function NovoCandidato({ ongId, inicial, onCadastrado, onFechar }: {
             onChange={(e) => setNovaTag((s) => ({ ...s, tag: e.target.value }))}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
             className="min-w-0 flex-1 rounded-2xl bg-white/80 px-4 py-2.5 text-sm shadow-[inset_0_0_0_1px_rgba(16,46,80,.10)] outline-none focus:shadow-[inset_0_0_0_1.5px_#e78b48]" />
-          <Button type="button" variant="ghost" onClick={addTag}>＋</Button>
+          <Button type="button" variant="ghost" onClick={addTag} aria-label="Adicionar"><Plus className="h-4 w-4" aria-hidden /></Button>
         </div>
         <datalist id="skills-catalogo">{catalogoSkills.map((s) => <option key={s} value={s} />)}</datalist>
         <div className="flex flex-wrap gap-2">
@@ -369,9 +370,9 @@ function NovoCandidato({ ongId, inicial, onCadastrado, onFechar }: {
             {tags.map((t) => (
               <motion.button key={t.categoria + t.tag} type="button" layout
                 initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }} transition={spring}
-                onClick={() => setTags((s) => s.filter((x) => x !== t))} title="Remover"
+                onClick={() => setTags((s) => s.filter((x) => x !== t))} title="Remover" aria-label={`Remover ${t.tag}`}
                 className="rounded-full bg-sun/50 px-3 py-1 text-xs font-semibold hover:bg-brick/10 hover:text-brick">
-                {t.tag} ✕
+                {t.tag} <X className="h-3 w-3" aria-hidden />
               </motion.button>
             ))}
           </AnimatePresence>

@@ -28,8 +28,18 @@ function csp(nonce: string) {
   ].join("; ");
 }
 
+/**
+ * Modo "só demonstração" (DEMO_ONLY=1, usado na hospedagem do protótipo, que não tem backend): tudo que não for o
+ * protótipo, um arquivo estático ou um ícone/manifesto redireciona para /demo.
+ */
+const somenteDemo = () => process.env.DEMO_ONLY === "1";
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (somenteDemo() && pathname !== "/demo" && !pathname.startsWith("/demo/") && !/\.[a-z0-9]+$/i.test(pathname)) {
+    return NextResponse.redirect(new URL("/demo", req.url));
+  }
 
   if (PRIVADAS.some((a) => pathname === a || pathname.startsWith(a + "/"))) {
     // access token vencido ainda indica o papel; o BFF o renova na primeira chamada à API.
