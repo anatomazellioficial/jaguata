@@ -174,8 +174,12 @@ class IntegracoesClientTest {
 
     @Test
     void receita_servidorForaDoArViraServicoExterno() {
-        server.close();
-        assertThrows(ServicoExternoException.class, () -> receita.consultar(CNPJ));
+        // porta 1 do loopback: ninguém escuta, a conexão é recusada na hora. (Fechar o servidor do teste e chamar a
+        // mesma porta dava corrida: o sistema ainda aceitava a conexão e respondia o 404 padrão, o que falhava no CI.)
+        String morta = "http://127.0.0.1:1";
+        ReceitaClient foraDoAr = new BrasilApiReceitaClient(
+                new IntegracoesProperties(morta, morta, "jaguata-teste/1.0", 500, 400, 0, 24, 30));
+        assertThrows(ServicoExternoException.class, () -> foraDoAr.consultar(CNPJ));
     }
 
     // ---------------------------------------------------------------- CEP e coordenadas
