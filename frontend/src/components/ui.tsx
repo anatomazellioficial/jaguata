@@ -343,7 +343,7 @@ export function ChipGroup({ label, options, value, onChange, max }: {
               disabled={!on && max !== undefined && value.length >= max}
               onClick={() => onChange(on ? value.filter((x) => x !== o.codigo) : [...value, o.codigo])}
               className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
-                on ? "bg-orange text-white shadow-sm" : "bg-navy/[.06] text-navy hover:bg-navy/10"}`}>
+                on ? "bg-orange text-navy shadow-sm" : "bg-navy/[.06] text-navy hover:bg-navy/10"}`}>
               {o.rotulo}
             </button>
           );

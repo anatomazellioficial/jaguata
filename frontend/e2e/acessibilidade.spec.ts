@@ -80,6 +80,40 @@ for (const vp of [{ nome: "desktop", w: 1280, h: 900 }, { nome: "celular", w: 37
       await varrer(page, "/registro (ONG)", vp.nome);
     });
 
+    // protótipo de apresentação (/demo): percorre o roteiro inteiro e varre as telas principais
+    test("protótipo /demo", async ({ page }) => {
+      const papel = (nome: string) => page.getByRole("tablist", { name: "Quem está usando" }).getByRole("tab", { name: nome, exact: true });
+      await page.goto("/demo");
+      await page.getByRole("button", { name: "Consultar na Receita" }).click();
+      await page.getByText("Situação ATIVA").waitFor();
+      await varrer(page, "/demo (cadastro)", vp.nome);
+
+      await papel("Administração").click();
+      await page.getByRole("button", { name: "Verificar ONG" }).click();
+      await varrer(page, "/demo (administração)", vp.nome);
+
+      await papel("ONG").click();
+      await page.getByRole("button", { name: "Cadastrar candidato" }).click();
+      await page.getByRole("button", { name: /Preencher exemplo/ }).click();
+      await varrer(page, "/demo (candidato, formulário)", vp.nome);
+      await page.getByRole("button", { name: "Salvar candidato" }).click();
+      await page.getByText("Davi Martins").waitFor();
+
+      await papel("Empresa").click();
+      await page.getByRole("button", { name: "Publicar vaga" }).first().click();
+      await page.getByRole("button", { name: /Preencher exemplo/ }).click();
+      await varrer(page, "/demo (vaga, formulário)", vp.nome);
+      await page.getByRole("button", { name: "Publicar vaga" }).last().click();
+      await page.getByRole("button", { name: "Buscar candidatos" }).click();
+      await page.getByRole("button", { name: "Por quê?" }).first().click();
+      await varrer(page, "/demo (ranking)", vp.nome);
+
+      await papel("ONG").click();
+      await page.getByRole("tab", { name: "Funil" }).click();
+      await page.getByRole("button", { name: "Por quê?" }).first().click();
+      await varrer(page, "/demo (funil)", vp.nome);
+    });
+
     test("ONG logada", async ({ page }) => {
       await entrar(page, emailOng);
       await varrer(page, "/ong (Funil)", vp.nome);

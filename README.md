@@ -19,6 +19,7 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 - [Integração contínua (CI)](#integração-contínua-ci)
 - [SEO, metadados e ícones](#seo-metadados-e-ícones)
 - [Acessibilidade e desempenho](#acessibilidade-e-desempenho)
+- [Protótipo para apresentações](#protótipo-para-apresentações)
 - [Segurança](#segurança)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Limitações conhecidas e próximos passos](#limitações-conhecidas-e-próximos-passos)
@@ -325,6 +326,31 @@ Os dois rodam no job **E2E** do CI. A varredura axe cobre também estados intera
 - **Desempenho:** o `framer-motion` é carregado sob demanda (`LazyMotion`), a entrada do herói e do cartão de login são CSS puro (antes o texto nascia invisível esperando JavaScript, o que atrasava o LCP), os blobs borrados animados só existem em telas médias para cima e o vidro fosco usa desfoque menor no celular.
 
 **Limites desta auditoria:** ferramentas automáticas pegam só parte dos problemas de acessibilidade. Ainda vale testar à mão com um leitor de tela (NVDA/VoiceOver), zoom de 200% e navegação só por teclado, e com usuários reais (especialmente pessoas com deficiência). As medições de desempenho usam um servidor local com CPU reduzida pelo Lighthouse; os valores variam de uma execução para outra, por isso o limite do CI é um piso (60) e não a meta (85).
+
+## Protótipo para apresentações
+
+`/demo` é um **passeio guiado** pelo fluxo completo, no mesmo visual da plataforma, para apresentar como ela funciona sem precisar de backend, banco, login nem internet. Os dados são fictícios e vivem só na memória da aba (recarregar a página ou clicar em **Reiniciar** volta ao começo).
+
+```bash
+cd frontend && npm run dev      # abra http://localhost:3000/demo  (no compose, use a porta do front: /demo)
+```
+
+O painel **Roteiro** (à direita; no celular, a faixa "passo atual" no topo) conduz 8 passos, e cada um é uma tela real e clicável. O seletor no topo troca de papel (Visitante · Administração · ONG · Empresa):
+
+| # | Papel | O que mostra |
+|---|---|---|
+| 1 | Visitante | Cadastro só com o CNPJ: dados vindos da Receita |
+| 2 | Administração | Verificação da ONG (sem ela, nada de matches) |
+| 3 | ONG | Cadastro de candidato (botão **Preencher exemplo**); autodeclarações marcadas com 🔒, só a ONG vê |
+| 4 | Empresa | Publicação de vaga, inclusive afirmativa com justificativa |
+| 5 | Empresa | Busca com **ranking explicável** (posição e "Por quê?", sem nota e sem o critério afirmativo) |
+| 6 | ONG | Vê a nota completa e **envia** o candidato |
+| 7 | Empresa | Chama para entrevista e **contrata** |
+| 8 | ONG/Empresa | Relatório de impacto, que se atualiza com o que foi feito |
+
+**Roteiro sugerido (3 minutos):** siga o Roteiro de cima a baixo clicando em *Ir para o passo N*; use **Preencher exemplo** nos passos 3 e 4; no 5, abra o *Por quê?* na empresa e depois na ONG para mostrar a diferença de visibilidade; feche no 8.
+
+Onde está: `frontend/src/demo/` (dados e motor de pontuação simplificado, com os mesmos critérios e pesos do Score v2; `DemoApp.tsx`) e `frontend/src/app/demo/` (a rota, com `noindex` e fora do sitemap). Não altera nem depende de nenhuma tela real, exceto por reaproveitar os componentes de `components/ui.tsx`. A varredura de acessibilidade (axe) também percorre o protótipo.
 
 ## Segurança
 

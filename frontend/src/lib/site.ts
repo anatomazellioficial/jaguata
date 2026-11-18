@@ -15,4 +15,5 @@ export const PAGINAS_PUBLICAS = ["/", "/registro", "/login", "/termos", "/privac
 /** Áreas logadas e telas de fluxo: nunca devem aparecer em buscadores. */
 export const AREAS_PRIVADAS = [
   "/empresa", "/ong", "/admin", "/conta", "/aceitar-termos", "/verificar-email", "/redefinir-senha", "/esqueci-senha",
+  "/demo",   // protótipo de apresentação: dados fictícios, só por link
 ];
