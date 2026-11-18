@@ -5,7 +5,7 @@ import { Logo } from "./Logo";
 /** Moldura das páginas legais (Termos e Privacidade). Texto estático, renderizado no servidor. */
 export function LegalPage({ titulo, versao, children }: { titulo: string; versao: string; children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-3xl px-5 pb-24 pt-8">
+    <main id="conteudo" tabIndex={-1} className="mx-auto max-w-3xl px-5 pb-24 pt-8 outline-none">
       <header className="flex items-center justify-between">
         <Logo />
         <nav className="flex gap-4 text-sm font-medium text-mute">

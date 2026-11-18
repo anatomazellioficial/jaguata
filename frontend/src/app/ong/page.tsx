@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
@@ -112,7 +112,7 @@ function Fila({ ongId, novoCadastro }: { ongId: string; novoCadastro: number }) 
               whileHover={{ y: -2 }}
               className="glass flex flex-wrap items-center gap-4 rounded-[26px] p-4 sm:p-5">
               <Avatar name={m.candidatoNome} size={48} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-40">
                 <p className="truncate text-lg font-semibold tracking-tight">{m.candidatoNome}</p>
                 <p className="truncate text-sm text-mute">para {m.tituloVaga}</p>
               </div>

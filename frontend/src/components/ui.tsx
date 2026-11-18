@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, animate, motion, useDragControls } from "framer-motion";
+import { AnimatePresence, animate, m as motion, useDragControls } from "framer-motion";
 import {
   useEffect, useId, useRef,
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes,
@@ -55,7 +55,7 @@ export function Button({ variant = "primary", size = "md", loading, className = 
     primary: "bg-orange text-navy shadow-[0_6px_18px_-6px_rgba(231,139,72,.7)] hover:bg-[#ee9858]",
     dark: "bg-navy text-cream shadow-[0_6px_18px_-8px_rgba(16,46,80,.6)] hover:bg-[#1a3f6b]",
     ghost: "bg-navy/[.06] text-navy hover:bg-navy/[.11]",
-    danger: "bg-brick/10 text-brick hover:bg-brick hover:text-cream",
+    danger: "bg-brick/10 text-brick-ink hover:bg-brick hover:text-cream",
   }[variant];
   const sizes = size === "sm" ? "px-3.5 py-1.5 text-[13px]" : "px-5 py-2.5 text-sm";
   return (
@@ -85,13 +85,16 @@ const fieldBase =
   "focus:bg-white focus:shadow-[inset_0_0_0_1.5px_#e78b48,0_0_0_5px_rgba(231,139,72,.16)]";
 
 export function Field({ label, error, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string; hint?: string }) {
+  const id = useId();
+  const descricao = error ? `${id}-erro` : hint ? `${id}-dica` : undefined;
   return (
     <label className="block">
       <span className="mb-1.5 block text-[13px] font-medium text-mute">{label}</span>
-      <input className={fieldBase} {...props} />
-      {hint && !error && <span className="mt-1.5 block text-xs text-mute">{hint}</span>}
+      <input className={fieldBase} aria-invalid={error ? true : undefined} aria-describedby={descricao} {...props} />
+      {hint && !error && <span id={`${id}-dica`} className="mt-1.5 block text-xs text-mute">{hint}</span>}
       {error && (
-        <motion.span initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-1.5 block text-xs text-brick">
+        <motion.span id={`${id}-erro`} role="alert" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+          className="mt-1.5 block text-xs text-brick-ink">
           {error}
         </motion.span>
       )}
@@ -117,7 +120,7 @@ export function Select({ label, children, ...props }: SelectHTMLAttributes<HTMLS
 /* ------------------------------------------------------------------ avisos */
 export function Notice({ kind = "error", children }: { kind?: "error" | "info" | "ok"; children: ReactNode }) {
   const c = {
-    error: "bg-brick/[.08] text-brick",
+    error: "bg-brick/[.08] text-brick-ink",
     info: "bg-navy/[.05] text-mute",
     ok: "bg-sun/30 text-navy",
   }[kind];
@@ -142,7 +145,7 @@ const badgeColor: Record<StatusMatch, string> = {
   ENVIADO: "bg-navy/10 text-navy",
   ENTREVISTA: "bg-sun/50 text-navy",
   CONTRATADO: "bg-navy text-cream",
-  RECUSADO: "bg-brick/10 text-brick",
+  RECUSADO: "bg-brick/10 text-brick-ink",
 };
 
 export function StatusBadge({ status }: { status: StatusMatch }) {
@@ -204,11 +207,22 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
   const id = useId();
   return (
     <div className="no-scrollbar max-w-full overflow-x-auto">
-      <div role="tablist" aria-label={label} className="relative inline-flex rounded-full bg-navy/[.06] p-1">
+      <div role="tablist" aria-label={label} className="relative inline-flex rounded-full bg-navy/[.06] p-1"
+        onKeyDown={(e) => {
+          // teclado (padrão WAI-ARIA): setas, Home e End movem entre as abas; só a aba ativa entra na ordem do Tab
+          const i = options.findIndex((o) => o.value === value);
+          const prox = e.key === "ArrowRight" ? (i + 1) % options.length
+            : e.key === "ArrowLeft" ? (i - 1 + options.length) % options.length
+            : e.key === "Home" ? 0 : e.key === "End" ? options.length - 1 : -1;
+          if (prox < 0) return;
+          e.preventDefault();
+          onChange(options[prox].value);
+          (e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[prox])?.focus();
+        }}>
         {options.map((o) => {
           const active = o.value === value;
           return (
-            <button key={o.value} role="tab" aria-selected={active} onClick={() => onChange(o.value)}
+            <button key={o.value} role="tab" aria-selected={active} tabIndex={active ? 0 : -1} onClick={() => onChange(o.value)}
               className={`relative z-10 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${active ? "text-navy" : "text-mute hover:text-navy"}`}>
               {active && (
                 <motion.span layoutId={`seg-${id}`} transition={spring} className="absolute inset-0 -z-10 rounded-full bg-white shadow-soft" />
@@ -229,12 +243,29 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const anterior = document.activeElement as HTMLElement | null;   // devolve o foco a quem abriu o diálogo
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onClose();
+      if (e.key !== "Tab" || !ref.current) return;
+      // prende o Tab dentro do diálogo (aria-modal): do último elemento volta ao primeiro e vice-versa
+      const focaveis = [...ref.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
+      )].filter((el) => el.offsetParent !== null);
+      if (focaveis.length === 0) return;
+      const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
+      const ativo = document.activeElement;
+      if (e.shiftKey && (ativo === primeiro || ativo === ref.current)) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && ativo === ultimo) { e.preventDefault(); primeiro.focus(); }
+    };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     ref.current?.focus();
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+      anterior?.focus?.();
+    };
   }, [open, onClose]);
 
   return (

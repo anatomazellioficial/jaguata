@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import type { ConsultaCep, ConsultaCnpj } from "@/lib/types";

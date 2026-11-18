@@ -18,6 +18,7 @@ Plataforma de *matchmaking* B2B que conecta **empresas** (foco em PMEs) a **ONGs
 - [Testes](#testes)
 - [Integração contínua (CI)](#integração-contínua-ci)
 - [SEO, metadados e ícones](#seo-metadados-e-ícones)
+- [Acessibilidade e desempenho](#acessibilidade-e-desempenho)
 - [Segurança](#segurança)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Limitações conhecidas e próximos passos](#limitações-conhecidas-e-próximos-passos)
@@ -259,7 +260,7 @@ Códigos relevantes: `400` dados inválidos (inclui CNPJ com dígito verificador
 cd backend && mvn test        # requer Docker (Testcontainers sobe um PostGIS real)
 cd frontend && npm run typecheck
 cd frontend && npm test       # Vitest (19): utilitários, CSP/guarda de rotas (proxy), SEO, componentes e login com 2FA
-cd frontend && npm run e2e    # Playwright (8 testes): jornadas completas no navegador (veja abaixo)
+cd frontend && npm run e2e    # Playwright (17): 8 jornadas + varredura de acessibilidade (axe), veja abaixo
 ```
 
 ### Teste ponta a ponta no navegador (Playwright)
@@ -300,6 +301,30 @@ Para exigir o CI antes de integrar: *Settings → Branches → Branch protection
 - **Indexação**: só a página inicial, cadastro, login, Termos e Privacidade são indexáveis. Áreas logadas e telas de fluxo (verificação de e-mail, redefinição de senha, aceite de termos) saem com `noindex, nofollow` e também em `robots.txt`; `/sitemap.xml` lista apenas as públicas.
 - **Endereço público**: defina `SITE_URL` (ex.: `https://jaguata.org.br`) no frontend; ele alimenta canonical, sitemap, Open Graph e JSON-LD. Sem ele, usa `http://localhost:3000`.
 - **Ícones do "J"**: `favicon.ico` (16/32/48), `icon.svg`, `apple-icon.png`, ícones do manifesto web (192/512 e *maskable*) e a imagem de compartilhamento 1200×630 (com a fonte Lexend). Tudo é gerado do mesmo desenho da logo por `npm run icones` (`frontend/scripts/gerar-icones.mjs`) e os arquivos ficam versionados; rode de novo só se a logo mudar.
+
+## Acessibilidade e desempenho
+
+**Como medir** (a stack precisa estar no ar; veja *Teste ponta a ponta* acima):
+
+```bash
+cd frontend
+npm run a11y          # axe-core (WCAG 2.0/2.1/2.2 nível AA + boas práticas): páginas públicas e logadas, desktop e celular
+npm run lighthouse    # Lighthouse no celular: acessibilidade, boas práticas e SEO exigem 100; desempenho tem piso
+A11Y_RELATORIO=1 npx playwright test acessibilidade.spec.ts   # modo medição: imprime tudo em vez de falhar
+```
+Os dois rodam no job **E2E** do CI. A varredura axe cobre também estados interativos (diálogos abertos, abas, painéis expansíveis, resultado do CEP) e espera as animações de entrada assentarem, porque o contraste só vale no estado final.
+
+**Resultado da auditoria (Lighthouse, celular):** acessibilidade, boas práticas e SEO = **100** em todas as páginas públicas; desempenho de **88 a 97** (a página inicial foi de 71 para 94 e o cadastro teve o LCP de 3,3 s para 0,8 s). A varredura axe: **0 violações**.
+
+**O que foi corrigido e por quê**
+- **Contraste (WCAG 1.4.3):** o cinza dos rótulos (`#5b6b82`) dava 4,49:1 sobre o controle segmentado e passou a `#526279` (5,1:1); o texto de erro sobre fundo tingido de tijolo (4,44:1) usa `--color-brick-ink` (`#a43322`, 5,6:1). A cor da marca não mudou.
+- **Foco visível (1.4.11):** o contorno laranja dava 2,4:1; agora é azul-marinho com halo claro (e creme sobre fundos escuros).
+- **Estrutura e teclado:** marcos `header`/`main`, link "Pular para o conteúdo", títulos em ordem (`h1` → `h2`), abas navegáveis por setas/Home/End (padrão WAI-ARIA), foco preso e devolvido nos diálogos, mensagens de erro ligadas ao campo (`aria-invalid`/`aria-describedby`) e anunciadas (`role="alert"`).
+- **Movimento:** `prefers-reduced-motion` desliga as animações (JS e CSS).
+- **Celular:** a página da empresa estourava a largura e os nomes de candidatos eram cortados para uma letra; as linhas agora quebram corretamente.
+- **Desempenho:** o `framer-motion` é carregado sob demanda (`LazyMotion`), a entrada do herói e do cartão de login são CSS puro (antes o texto nascia invisível esperando JavaScript, o que atrasava o LCP), os blobs borrados animados só existem em telas médias para cima e o vidro fosco usa desfoque menor no celular.
+
+**Limites desta auditoria:** ferramentas automáticas pegam só parte dos problemas de acessibilidade. Ainda vale testar à mão com um leitor de tela (NVDA/VoiceOver), zoom de 200% e navegação só por teclado, e com usuários reais (especialmente pessoas com deficiência). As medições de desempenho usam um servidor local com CPU reduzida pelo Lighthouse; os valores variam de uma execução para outra, por isso o limite do CI é um piso (60) e não a meta (85).
 
 ## Segurança
 

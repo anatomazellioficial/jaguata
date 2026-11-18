@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useMotionValueEvent, useScroll, useTransform } from "framer-motion";
+import { m as motion, useMotionValueEvent, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -44,7 +44,7 @@ export function Shell({ title, subtitle, action, mobileAction, children }: {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-28 sm:px-6">
-      <motion.header
+      <motion.header role="banner"
         initial={{ y: -24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={spring}
         className={`print:hidden sticky top-3 z-40 mt-3 flex items-center justify-between rounded-full px-4 py-2.5 transition-[background,box-shadow] duration-300 ${scrolled ? "glass" : "border border-transparent"}`}
       >
@@ -75,6 +75,7 @@ export function Shell({ title, subtitle, action, mobileAction, children }: {
         <Link href="/conta" aria-label="Minha conta" className={aba(pathname === "/conta")}><Svg>{Icone.conta}</Svg></Link>
       </motion.nav>
 
+      <main id="conteudo" tabIndex={-1} className="outline-none">
       <motion.div
         initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: easeOut }}
         className="mb-10 mt-12 sm:mt-16"
@@ -86,6 +87,7 @@ export function Shell({ title, subtitle, action, mobileAction, children }: {
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.1, ease: easeOut }}>
         {children}
       </motion.div>
+      </main>
     </div>
   );
 }
@@ -95,16 +97,15 @@ export function AuthFrame({ title, subtitle, children, footer }: {
   title: string; subtitle?: string; children: ReactNode; footer: ReactNode;
 }) {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12">
-      <motion.div initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 24 }}
-        className="glass-strong rounded-[36px] p-7 sm:p-9">
+    <main id="conteudo" tabIndex={-1} className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12 outline-none">
+      {/* sem opacity 0 inicial: o cartão é o maior conteúdo da página (LCP) e não pode esperar JavaScript */}
+      <div className="glass-strong hero-in rounded-[36px] p-7 sm:p-9">
         <Logo />
         <h1 className="title mb-2 mt-9 text-4xl">{title}</h1>
         {subtitle && <p className="mb-7 text-[15px] text-mute">{subtitle}</p>}
         {!subtitle && <div className="mb-7" />}
         {children}
-      </motion.div>
+      </div>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
         className="mt-6 space-y-3 text-center text-sm text-mute">
         <p>{footer}</p>

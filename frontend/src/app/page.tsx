@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { m as motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { Avatar, Reveal, ScoreRing, easeOut, spring } from "@/components/ui";
@@ -219,32 +219,31 @@ export default function Home() {
   const titleOpacity = useTransform(scrollYProgress, [0, 0.9], [1, 0.2]);
 
   return (
-    <main className="overflow-x-clip">
+    <main id="conteudo" tabIndex={-1} className="overflow-x-clip outline-none">
       <Nav />
 
       <section ref={hero} className="mx-auto max-w-6xl px-5 pb-16 pt-36 text-center sm:pt-44">
         <motion.div style={{ y: titleY, opacity: titleOpacity }}>
-          <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ ...spring, delay: 0.1 }}
-            className="glass mx-auto mb-8 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium">
+          <div className="glass hero-in mx-auto mb-8 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-medium">
             <span className="h-2 w-2 rounded-full bg-orange" /> Empregabilidade em rede · ODS 8
-          </motion.div>
+          </div>
           <h1 className="display text-[2.9rem] sm:text-7xl lg:text-[5.5rem]">
             {["Talento que chega", "chancelado."].map((t, i) => (
               <span key={t} className="block overflow-hidden pb-[0.12em]">
-                <motion.span initial={{ y: "110%" }} animate={{ y: 0 }} transition={{ duration: 1, delay: 0.2 + i * 0.14, ease: easeOut }}
-                  className={`block ${i === 1 ? "gradient-text" : ""}`}>
+                <span style={{ "--atraso": `${0.05 + i * 0.09}s` } as React.CSSProperties}
+                  className={`hero-linha block ${i === 1 ? "gradient-text" : ""}`}>
                   {t}
-                </motion.span>
+                </span>
               </span>
             ))}
           </h1>
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.9, ease: easeOut }}
-            className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-mute sm:text-xl">
+          <p style={{ "--atraso": "0.2s" } as React.CSSProperties}
+            className="hero-in mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-mute sm:text-xl">
             A ONG vira o RH que a sua PME não pode pagar: pré-qualifica e envia pessoas em vulnerabilidade social,
             todas maiores de 18 anos, direto para as suas vagas.
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.9, ease: easeOut }}
-            className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          </p>
+          <div style={{ "--atraso": "0.3s" } as React.CSSProperties}
+            className="hero-in mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link href="/registro?tipo=empresa">
               <motion.span whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} transition={spring}
                 className="inline-block rounded-full bg-orange px-7 py-3.5 font-semibold text-navy shadow-[0_10px_26px_-8px_rgba(231,139,72,.8)]">
@@ -257,7 +256,7 @@ export default function Home() {
                 Sou ONG
               </motion.span>
             </Link>
-          </motion.div>
+          </div>
         </motion.div>
 
         <HeroCards />
@@ -297,7 +296,7 @@ export default function Home() {
           ].map((c, i) => (
             <Reveal key={c.t} delay={i * 0.1}>
               <motion.div whileHover={{ y: -5 }} transition={spring}
-                className={`h-full rounded-[36px] p-9 ${c.dark ? "bg-navy text-cream shadow-lift" : "glass"}`}>
+                className={`h-full rounded-[36px] p-9 ${c.dark ? "on-dark bg-navy text-cream shadow-lift" : "glass"}`}>
                 <h3 className="title text-3xl">{c.t}</h3>
                 <p className={`mt-2 ${c.dark ? "text-cream/70" : "text-mute"}`}>{c.d}</p>
                 <ul className="mt-6 space-y-3">
@@ -322,11 +321,11 @@ export default function Home() {
 
       <section className="mx-auto max-w-6xl px-5 pb-28">
         <Reveal>
-          <div className="relative overflow-hidden rounded-[44px] bg-navy px-8 py-20 text-center text-cream">
+          <div className="on-dark relative overflow-hidden rounded-[44px] bg-navy px-8 py-20 text-center text-cream">
             <motion.span animate={{ x: [0, 40, 0], y: [0, -20, 0] }} transition={{ repeat: Infinity, duration: 14, ease: "easeInOut" }}
-              className="absolute -left-20 -top-24 h-72 w-72 rounded-full bg-orange/40 blur-3xl" />
+              className="absolute -left-20 -top-24 hidden h-72 w-72 rounded-full bg-orange/40 blur-3xl md:block" />
             <motion.span animate={{ x: [0, -40, 0], y: [0, 24, 0] }} transition={{ repeat: Infinity, duration: 16, ease: "easeInOut" }}
-              className="absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-sun/30 blur-3xl" />
+              className="absolute -bottom-24 -right-16 hidden h-80 w-80 rounded-full bg-sun/30 blur-3xl md:block" />
             <h2 className="title relative text-4xl sm:text-6xl">Vaga aberta?<br />Tem gente pronta.</h2>
             <Link href="/registro" className="relative">
               <motion.span whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.96 }} transition={spring}

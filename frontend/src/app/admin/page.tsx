@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { Avatar, Button, Card, Notice, Segmented, Select, Skeleton, Stat, spring } from "@/components/ui";

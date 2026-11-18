@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { CepField } from "@/components/Lookups";
 import { Shell } from "@/components/Shell";
@@ -355,10 +355,10 @@ function VagaCard({ vaga, index, versao, onEditar, onExcluida, onAtualizar }: {
   return (
     <motion.article layout initial={{ opacity: 0, y: 28, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
       transition={{ ...spring, delay: Math.min(index * 0.06, 0.3) }}
-      className="glass rounded-[32px] p-6">
+      className="glass min-w-0 rounded-[32px] p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="title text-2xl">{vaga.tituloExibicao}</h3>
+          <h2 className="title text-2xl">{vaga.tituloExibicao}</h2>
           <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
             <span className="rounded-full bg-navy/[.06] px-3 py-1">{ROTULO_CONTRATO[vaga.tipoContrato]}</span>
             <span className="rounded-full bg-navy/[.06] px-3 py-1">{ROTULO_MODELO[vaga.modeloTrabalho]}</span>
@@ -446,9 +446,9 @@ function VagaCard({ vaga, index, versao, onEditar, onExcluida, onAtualizar }: {
           <AnimatePresence initial={false}>
             {matches.map((m, i) => (
               <motion.li key={m.id} layout initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ ...spring, delay: i * 0.04 }}
-                className="flex flex-wrap items-center gap-3 px-4 py-3.5">
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3.5 sm:px-4">
                 <Avatar name={m.candidatoNome} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-36">
                   <p className="truncate font-semibold tracking-tight">{m.candidatoNome}</p>
                   <div className="mt-1 flex items-center gap-2">
                     <StatusBadge status={m.status} />
@@ -464,7 +464,7 @@ function VagaCard({ vaga, index, versao, onEditar, onExcluida, onAtualizar }: {
                     #{m.posicao}
                   </span>
                 )}
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto">
                   {m.status === "SUGERIDO" && <span className="text-xs text-mute">aguardando a ONG</span>}
                   {m.status === "ENVIADO" && <Button size="sm" variant="ghost" onClick={() => mover(m.id, "ENTREVISTA")}>Entrevistar</Button>}
                   {m.status === "ENTREVISTA" && <Button size="sm" onClick={() => mover(m.id, "CONTRATADO")}>Contratar</Button>}

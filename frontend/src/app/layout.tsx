@@ -67,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt-BR">
       <body>
+        <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
         {/* application/ld+json não executa código, então a CSP com nonce não o bloqueia */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(siteUrl()) }} />
         <Providers>{children}</Providers>

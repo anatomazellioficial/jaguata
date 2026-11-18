@@ -68,7 +68,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   # ---------------------------------------------------------------------------------------------------------
-  # Ponta a ponta: stack real (docker compose) + APIs públicas simuladas + Playwright (Chromium)
+  # Ponta a ponta: stack real (docker compose) + APIs públicas simuladas + Playwright (Chromium).
+  # Inclui a varredura de acessibilidade (axe, WCAG 2.2 AA) e a auditoria Lighthouse das páginas públicas.
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
@@ -118,6 +119,11 @@ jobs:
       - name: Testes ponta a ponta
         working-directory: frontend
         run: npm run e2e
+      - name: Lighthouse (acessibilidade, SEO, boas práticas e desempenho no celular)
+        working-directory: frontend
+        env:
+          LH_BASE: http://localhost:3000
+        run: npm run lighthouse
       - name: Logs da stack (em caso de falha)
         if: failure()
         run: docker compose logs --tail=200

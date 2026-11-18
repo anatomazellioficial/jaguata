@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { Suspense, useEffect, useState } from "react";
 import { AuthFrame } from "@/components/Shell";
 import { Button, Field, Notice } from "@/components/ui";

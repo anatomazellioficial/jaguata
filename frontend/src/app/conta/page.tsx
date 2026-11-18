@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { Button, Card, Field, Notice, Skeleton, Switch, spring } from "@/components/ui";
