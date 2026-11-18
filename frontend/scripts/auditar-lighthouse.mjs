@@ -21,11 +21,16 @@ let falhou = false;
 console.log("página".padEnd(14), "perf  a11y  bp   seo   FCP     LCP     TBT      CLS");
 for (const rota of PAGINAS) {
   const arquivo = `${saida}/ci-${rota === "/" ? "home" : rota.slice(1)}.json`;
-  const r = spawnSync(process.execPath, [
-    cli, BASE + rota, "--only-categories=performance,accessibility,best-practices,seo", "--output=json",
-    `--output-path=${arquivo}`, "--chrome-flags=--headless=new --no-sandbox", "--quiet",
-  ], { stdio: "ignore", timeout: 240_000 });
-  if (r.status !== 0) { console.error(`  ✗ ${rota}: o Lighthouse falhou (status ${r.status})`); falhou = true; continue; }
+  // o processo do Lighthouse/Chrome cai de vez em quando em runners compartilhados: tenta até 3 vezes (as notas não são relaxadas)
+  let r;
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    r = spawnSync(process.execPath, [
+      cli, BASE + rota, "--only-categories=performance,accessibility,best-practices,seo", "--output=json",
+      `--output-path=${arquivo}`, "--chrome-flags=--headless=new --no-sandbox", "--quiet",
+    ], { stdio: "ignore", timeout: 240_000 });
+    if (r.status === 0) break;
+  }
+  if (r.status !== 0) { console.error(`  ✗ ${rota}: o Lighthouse falhou 3 vezes (status ${r.status})`); falhou = true; continue; }
 
   const lhr = JSON.parse(readFileSync(arquivo, "utf8"));
   const nota = (c) => Math.round(lhr.categories[c].score * 100);
